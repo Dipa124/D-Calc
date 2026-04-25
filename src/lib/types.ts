@@ -132,10 +132,10 @@ export const SALE_TYPE_CONFIG: Record<SaleType, { marginMultiplier: number; subt
 
 // ─── Pricing tier config (Lujo = diamond blue) ───
 export const PRICING_TIER_CONFIG: Record<PricingTier, { label: string; description: string; baseMargin: number; color: string; accent: string; darkAccent: string }> = {
-  competitive: { label: 'Competitive', description: 'Aggressive pricing', baseMargin: 0.25, color: 'sage', accent: 'bg-sage/15 text-sage border-sage/30', darkAccent: '#6B9E72' },
-  standard: { label: 'Standard', description: 'Balanced margin', baseMargin: 0.60, color: 'copper', accent: 'bg-copper/15 text-copper border-copper/30', darkAccent: '#C77D3A' },
-  premium: { label: 'Premium', description: 'Quality positioning', baseMargin: 1.20, color: 'gold', accent: 'bg-gold/15 text-gold border-gold/30', darkAccent: '#D4A843' },
-  luxury: { label: 'Luxury', description: 'Exclusive service', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
+  competitive: { label: 'competitive', description: 'Aggressive pricing', baseMargin: 0.25, color: 'sage', accent: 'bg-sage/15 text-sage border-sage/30', darkAccent: '#6B9E72' },
+  standard: { label: 'standard', description: 'Balanced margin', baseMargin: 0.60, color: 'copper', accent: 'bg-copper/15 text-copper border-copper/30', darkAccent: '#C77D3A' },
+  premium: { label: 'premium', description: 'Quality positioning', baseMargin: 1.20, color: 'gold', accent: 'bg-gold/15 text-gold border-gold/30', darkAccent: '#D4A843' },
+  luxury: { label: 'luxury', description: 'Exclusive service', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
 };
 
 // ─── Finishing defaults (custom has no suggested price) ───

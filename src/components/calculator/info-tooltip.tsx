@@ -30,7 +30,7 @@ export function InfoTooltip({ text, side = 'top' }: InfoTooltipProps) {
         <TooltipContent
           side={side}
           sideOffset={6}
-          className="max-w-[260px] text-xs leading-relaxed bg-popover border border-border shadow-lg rounded-lg px-3 py-2"
+          className="max-w-[260px] text-xs leading-relaxed bg-popover text-popover-foreground border border-border shadow-lg rounded-lg px-3 py-2"
         >
           {text}
         </TooltipContent>

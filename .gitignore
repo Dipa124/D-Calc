@@ -32,23 +32,40 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
+
+# database
+db/*.db
+db/*.db-journal
+
+# logs
 *.log
 dev.log
 dev.out.log
-test
-prompt
-
 server.log
+
+# local/agent
+local-*
+.claude
+.z-ai-config
+agent-ctx/
+worklog.md
+
 # Skills directory
 /skills/
+
+# mini services
+/mini-services/
+
+# examples
+/examples/
+
+# Caddy
+Caddyfile

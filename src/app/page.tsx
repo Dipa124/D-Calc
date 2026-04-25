@@ -7,7 +7,7 @@ import { useI18n } from '@/hooks/use-i18n'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
 import { useToast } from '@/hooks/use-toast'
-import type { Project, SubPiece, SaleType, PricingTier, ProjectParams } from '@/lib/types'
+import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType } from '@/lib/types'
 import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS } from '@/lib/types'
 import { CURRENCIES, detectCurrency, type CurrencyCode } from '@/lib/currency'
 import { PRINTER_DATABASE, getPrintersByBrand, getPrinterById } from '@/lib/printers'
@@ -20,17 +20,17 @@ import {
   Plus, Printer, Settings, Pencil, Copy, Check, Clock, Weight, Hash, Package,
   RotateCcw, Sparkles, Calculator, Layers, DollarSign, FileDown, X, Save,
   Loader2, LogIn, ShoppingBag, ChevronDown, ChevronRight, Globe, Coins,
-  PenTool, Zap, Wrench, Percent, Truck, Eye, EyeOff, Trash2
+  PenTool, Zap, Wrench, Percent, Truck, Eye, EyeOff, Trash2, FileText, Receipt
 } from 'lucide-react'
 
 // ─── Animation variants ───
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } },
 }
 const sectionVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' } },
 }
 
 // ─── Helpers ───
@@ -63,6 +63,12 @@ const SALE_TYPE_ICONS: Record<SaleType, React.ReactNode> = {
 export default function Home() {
   const { data: session } = useSession()
   const { locale, setLocale, t } = useI18n()
+  const tierNameMap: Record<string, string> = {
+    competitive: t.competitive,
+    standard: t.standard,
+    premium: t.premium,
+    luxury: t.luxury,
+  }
   const { project, setProject, resetProject, hasStoredData } = usePersistedProject()
   const { toast } = useToast()
 
@@ -73,7 +79,7 @@ export default function Home() {
   const [showDashboard, setShowDashboard] = useState(false)
   const [savingProject, setSavingProject] = useState(false)
   const [recordingSale, setRecordingSale] = useState(false)
-  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(true)
 
   // Refs for pencil focus
   const projectNameRef = useRef<HTMLInputElement>(null)
@@ -243,7 +249,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Ambient glows — exactly 2 */}
+      {/* Ambient glows */}
       <div className="ambient-glow-1" />
       <div className="ambient-glow-2" />
 
@@ -272,44 +278,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Center: Language + Currency selectors */}
-          <div className="flex items-center gap-2">
-            {/* Language selector */}
-            <div className="relative">
-              <Globe className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={locale}
-                onChange={(e) => setLocale(e.target.value as Locale)}
-                className="h-8 pl-7 pr-2 rounded-lg bg-secondary/80 border border-border text-xs text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-copper"
-              >
-                {Object.entries(LOCALE_NAMES).map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {LOCALE_FLAGS[code as Locale]} {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Currency selector */}
-            <div className="relative">
-              <Coins className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={project.currency}
-                onChange={(e) => updateProject({ currency: e.target.value as CurrencyCode })}
-                className="h-8 pl-7 pr-2 rounded-lg bg-secondary/80 border border-border text-xs text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-copper"
-              >
-                {Object.entries(CURRENCIES).map(([code, info]) => (
-                  <option key={code} value={code}>
-                    {info.symbol} {code}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           {/* Right: Action buttons */}
           <div className="flex items-center gap-1.5">
-            {/* Save (authenticated only) */}
+            {/* Save */}
             {session?.user && (
               <motion.button
                 onClick={handleSaveProject}
@@ -336,7 +307,7 @@ export default function Home() {
               </motion.button>
             )}
 
-            {/* Settings */}
+            {/* Settings gear (only display prefs) */}
             <motion.button
               onClick={() => setSettingsOpen(true)}
               className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
@@ -365,10 +336,11 @@ export default function Home() {
             <Divider />
             <div className="flex items-center gap-2 ml-auto shrink-0">
               <div className="flex flex-col leading-tight">
-                <span className="text-[10px] text-muted-foreground">{selectedResult.tierLabel}</span>
+                <span className="text-[10px] text-muted-foreground">{tierNameMap[selectedResult.tier]}</span>
                 <motion.span
                   key={selectedResult.totalProjectPrice.toFixed(2)}
-                  initial={{ scale: 1.05 }} animate={{ scale: 1 }}
+                  initial={{ scale: 1.08 }} animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                   className="font-display font-extrabold text-lg text-copper"
                 >
                   {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
@@ -409,7 +381,33 @@ export default function Home() {
           {/* ═══ LEFT COLUMN ═══ */}
           <div className="lg:col-span-7 space-y-5">
 
-            {/* Sale type selector — inline */}
+            {/* Project name */}
+            <motion.section variants={sectionVariants}>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0">
+                  <Layers className="w-4 h-4 text-copper" />
+                </div>
+                <div className="flex items-center flex-1 min-w-0">
+                  <input
+                    ref={projectNameRef}
+                    type="text"
+                    value={project.name}
+                    onChange={(e) => updateProject({ name: e.target.value })}
+                    className="font-display font-extrabold text-xl sm:text-2xl text-foreground bg-transparent border-none outline-none flex-1 min-w-0 placeholder:text-muted-foreground"
+                    placeholder={t.pieceName}
+                  />
+                  <button
+                    onClick={() => { projectNameRef.current?.focus(); projectNameRef.current?.select() }}
+                    className="ml-0.5 p-1 rounded-md hover:bg-secondary/80 transition-colors shrink-0"
+                    aria-label="Edit project name"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+            </motion.section>
+
+            {/* Sale type selector */}
             <motion.section variants={sectionVariants} className="glass-card section-card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign className="w-4 h-4 text-copper" />
@@ -480,30 +478,80 @@ export default function Home() {
               </AnimatePresence>
             </motion.section>
 
-            {/* Project name */}
-            <motion.section variants={sectionVariants}>
+            {/* ═══ Printer Configuration (IN MAIN LAYOUT) ═══ */}
+            <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0">
-                  <Layers className="w-4 h-4 text-copper" />
-                </div>
-                <div className="flex items-center gap-1 flex-1 min-w-0">
-                  <input
-                    ref={projectNameRef}
-                    type="text"
-                    value={project.name}
-                    onChange={(e) => updateProject({ name: e.target.value })}
-                    className="font-display font-extrabold text-xl sm:text-2xl text-foreground bg-transparent border-none outline-none flex-1 min-w-0 placeholder:text-muted-foreground"
-                    placeholder={t.pieceName}
-                  />
-                  <button
-                    onClick={() => projectNameRef.current?.focus()}
-                    className="p-1 rounded-md hover:bg-secondary/80 transition-colors shrink-0"
-                    aria-label="Edit project name"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground/50" />
-                  </button>
-                </div>
+                <Printer className="w-4 h-4 text-copper" />
+                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2>
+                <InfoTooltip text={t.tooltipPrinterModel} />
               </div>
+
+              {/* Printer model selector */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Printer className="w-3.5 h-3.5" /> {t.printerModel}
+                </label>
+                <select
+                  value={project.params.printerModel}
+                  onChange={(e) => handlePrinterSelect(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
+                >
+                  <option value="custom">{t.printerDefaults}</option>
+                  {Object.entries(printersByBrand).map(([brand, printers]) => (
+                    <optgroup key={brand} label={brand}>
+                      {printers.map(p => (
+                        <option key={p.id} value={p.id}>{p.model}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Core parameters grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
+                <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
+                <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
+                <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
+                <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
+                <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
+              </div>
+
+              {/* Advanced toggle */}
+              <button
+                onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
+                className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                {advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
+                <motion.div animate={{ rotate: advancedSettingsOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-auto">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </motion.div>
+              </button>
+
+              <AnimatePresence>
+                {advancedSettingsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
+                      <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={1} />
+                      <SettingsField icon={<EyeOff className="w-3.5 h-3.5" />} label={t.additionalLabor} tooltip={t.tooltipAdditionalLabor} value={project.params.additionalLaborCostPerHour} onChange={(v) => updateParams({ additionalLaborCostPerHour: v })} step={1} />
+                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
+                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
+                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
+                      <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
+                      <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
+                      <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
+                      <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.section>
 
             {/* Sub-pieces */}
@@ -561,17 +609,6 @@ export default function Home() {
                 </motion.div>
               )}
             </motion.section>
-
-            {/* Settings button (mobile/tablet) */}
-            <motion.section variants={sectionVariants} className="lg:hidden">
-              <motion.button
-                onClick={() => setSettingsOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary/80 hover:bg-secondary border border-border text-foreground font-display font-semibold text-sm transition-colors"
-                whileTap={{ scale: 0.98 }}
-              >
-                <Settings className="w-4 h-4" /> {t.parameters}
-              </motion.button>
-            </motion.section>
           </div>
 
           {/* ═══ RIGHT COLUMN ═══ */}
@@ -604,7 +641,6 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {pricingResults.map((result) => {
-                  const config = PRICING_TIER_CONFIG[result.tier]
                   const isSelected = project.selectedTier === result.tier
                   const color = TIER_BAR_COLORS[result.tier]
                   return (
@@ -619,7 +655,7 @@ export default function Home() {
                           : 'border-border bg-card hover:border-border/80 hover:shadow-md'
                         }
                       `}
-                      whileHover={{ y: -1, scale: 1.01 }}
+                      whileHover={{ y: -2, scale: 1.01 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       {isSelected && (
@@ -635,7 +671,7 @@ export default function Home() {
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                         <span className={`font-display font-bold text-xs leading-tight ${isSelected ? 'text-copper' : 'text-foreground'}`}>
-                          {result.tierLabel}
+                          {tierNameMap[result.tier]}
                         </span>
                       </div>
                       <div className={`font-display font-black text-lg leading-none ${isSelected ? 'text-copper' : 'text-foreground'}`}>
@@ -666,7 +702,7 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: TIER_BAR_COLORS[project.selectedTier] }} />
-                      <span className="font-display font-bold text-sm text-copper">{selectedResult.tierLabel}</span>
+                      <span className="font-display font-bold text-sm text-copper">{tierNameMap[selectedResult.tier]}</span>
                       <span className="text-muted-foreground text-xs">—</span>
                       <span className="font-display font-bold text-sm text-foreground">
                         {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
@@ -677,10 +713,8 @@ export default function Home() {
                     </span>
                   </div>
 
-                  {/* Stacked bar */}
                   <BreakdownBar result={selectedResult} currency={project.currency} />
 
-                  {/* Legend */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                     <LegendItem color="#6B9E72" label={t.material} value={selectedResult.totalMaterialCost} currency={project.currency} />
                     <LegendItem color="#4FC3F7" label={t.operation} value={selectedResult.totalBaseCost - selectedResult.totalMaterialCost} currency={project.currency} />
@@ -700,7 +734,7 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <Calculator className="w-4 h-4 text-copper" />
                   <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">
-                    {t.costBreakdown} — {selectedResult.tierLabel}
+                    {t.costBreakdown} — {tierNameMap[selectedResult.tier]}
                   </h2>
                 </div>
                 <motion.div animate={{ rotate: breakdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -711,7 +745,6 @@ export default function Home() {
                 {breakdownOpen && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                     <div className="px-4 pb-4 max-h-96 overflow-y-auto">
-                      {/* Summary */}
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         <BreakdownSummaryItem label={t.totalMaterial} value={selectedResult.totalMaterialCost} currency={project.currency} />
                         <BreakdownSummaryItem label={t.totalBase} value={selectedResult.totalBaseCost} currency={project.currency} />
@@ -720,7 +753,6 @@ export default function Home() {
                         <BreakdownSummaryItem label={t.taxIncluded} value={selectedResult.totalTax} currency={project.currency} />
                         <BreakdownSummaryItem label={t.projectTotal} value={selectedResult.totalProjectPrice} currency={project.currency} highlight />
                       </div>
-                      {/* Per-piece breakdowns */}
                       {selectedResult.subPieceBreakdowns.map(b => (
                         <SubPieceBreakdown key={b.subPieceId} breakdown={b} currency={project.currency} t={t} />
                       ))}
@@ -730,47 +762,68 @@ export default function Home() {
               </AnimatePresence>
             </motion.section>
 
-            {/* Actions: Record Sale + Export */}
-            <motion.section variants={sectionVariants} className="flex flex-col sm:flex-row gap-3">
-              {session?.user && project.subPieces.length > 0 && (
+            {/* ═══ Export Section ═══ */}
+            <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileDown className="w-4 h-4 text-copper" />
+                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.exportSection}</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Producer Report */}
+                <motion.button
+                  onClick={() => {
+                    const html = generateProducerReport(project, selectedResult, tierNameMap, t)
+                    printHtml(html, `D-Calc_Report_${project.name}`)
+                  }}
+                  className="flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sage/10 border border-sage/25 text-sage font-display font-semibold text-xs hover:bg-sage/20 hover:shadow-lg hover:shadow-sage/10 transition-all"
+                  whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}
+                >
+                  <FileText className="w-5 h-5" />
+                  {t.producerReport}
+                </motion.button>
+                {/* Invoice */}
+                <motion.button
+                  onClick={() => {
+                    const html = generateInvoice(project, selectedResult, t)
+                    printHtml(html, `D-Calc_Invoice_${project.name}`)
+                  }}
+                  className="flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-xl bg-copper/10 border border-copper/25 text-copper font-display font-semibold text-xs hover:bg-copper/20 hover:shadow-lg hover:shadow-copper/10 transition-all"
+                  whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}
+                >
+                  <Receipt className="w-5 h-5" />
+                  {t.buyerTicket}
+                </motion.button>
+              </div>
+            </motion.section>
+
+            {/* Record Sale */}
+            {session?.user && project.subPieces.length > 0 && (
+              <motion.section variants={sectionVariants}>
                 <motion.button
                   onClick={handleRecordSale}
                   disabled={recordingSale}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sage to-sage/80 text-white font-display font-semibold text-sm hover:shadow-lg hover:shadow-sage/20 transition-all disabled:opacity-50"
-                  whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-sage to-sage/80 text-white font-display font-semibold text-sm hover:shadow-lg hover:shadow-sage/20 transition-all disabled:opacity-50"
+                  whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
                 >
                   {recordingSale ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
                   {t.recordSale}
                 </motion.button>
-              )}
-              <motion.button
-                onClick={() => {
-                  const tierConfig = PRICING_TIER_CONFIG[selectedResult.tier]
-                  const date = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
-                  const html = generateBuyerTicket(project, selectedResult, tierConfig, date)
-                  printHtml(html, `D-Calc_${project.name}`)
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-copper/15 border border-copper/30 text-copper font-display font-semibold text-sm hover:bg-copper/25 hover:shadow-lg hover:shadow-copper/10 transition-all"
-                whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}
-              >
-                <FileDown className="w-4 h-4" /> {t.buyerTicket}
-              </motion.button>
-            </motion.section>
+              </motion.section>
+            )}
           </div>
         </div>
       </motion.main>
 
       {/* ═══════════ FOOTER ═══════════ */}
       <footer className="mt-auto border-t border-border/50 py-3 text-center text-xs text-muted-foreground bg-background/80 backdrop-blur-sm">
-        <p className="font-display">D-<span className="text-copper">Calc</span> — {t.footerText}</p>
+        <p className="font-display">D-<span className="text-copper">Calc</span> — {t.appSubtitle}</p>
         <p className="mt-0.5 text-[10px]">{t.footerDisclaimer}</p>
       </footer>
 
-      {/* ═══════════ SETTINGS PANEL (Modal Drawer) ═══════════ */}
+      {/* ═══════════ SETTINGS DRAWER (Currency, Language, Theme ONLY) ═══════════ */}
       <AnimatePresence>
         {settingsOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -778,7 +831,6 @@ export default function Home() {
               className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm"
               onClick={() => setSettingsOpen(false)}
             />
-            {/* Panel */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
@@ -789,7 +841,7 @@ export default function Home() {
               <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-5 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Settings className="w-5 h-5 text-copper" />
-                  <h2 className="font-display font-bold text-lg text-foreground">{t.printParameters}</h2>
+                  <h2 className="font-display font-bold text-lg text-foreground">{t.parameters}</h2>
                 </div>
                 <button
                   onClick={() => setSettingsOpen(false)}
@@ -799,77 +851,53 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="p-5 space-y-5">
-                {/* Printer model selector */}
+              <div className="p-5 space-y-6">
+                {/* Currency */}
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Printer className="w-3.5 h-3.5" /> {t.printerModel}
-                    <InfoTooltip text={t.tooltipPrinterModel} />
+                    <Coins className="w-3.5 h-3.5" /> {t.currency}
                   </label>
                   <select
-                    value={project.params.printerModel}
-                    onChange={(e) => handlePrinterSelect(e.target.value)}
+                    value={project.currency}
+                    onChange={(e) => updateProject({ currency: e.target.value as CurrencyCode })}
                     className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
                   >
-                    <option value="custom">{t.printerDefaults}</option>
-                    {Object.entries(printersByBrand).map(([brand, printers]) => (
-                      <optgroup key={brand} label={brand}>
-                        {printers.map(p => (
-                          <option key={p.id} value={p.id}>{p.model} ({p.price}€)</option>
-                        ))}
-                      </optgroup>
+                    {Object.entries(CURRENCIES).map(([code, info]) => (
+                      <option key={code} value={code}>
+                        {info.symbol} {code} — {info.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Main parameters */}
-                <div className="space-y-3">
-                  <h3 className="font-display font-semibold text-xs text-muted-foreground uppercase tracking-wider">{t.parameters}</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
-                    <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
-                    <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
-                    <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
-                    <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
-                    <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
-                  </div>
+                {/* Language */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" /> {t.language}
+                  </label>
+                  <select
+                    value={locale}
+                    onChange={(e) => setLocale(e.target.value as Locale)}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
+                  >
+                    {Object.entries(LOCALE_NAMES).map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {LOCALE_FLAGS[code as Locale]} {name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Advanced toggle */}
-                <button
-                  onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
-                  className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  {advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
-                  <motion.div animate={{ rotate: advancedSettingsOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-auto">
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </motion.div>
-                </button>
-
-                <AnimatePresence>
-                  {advancedSettingsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
-                        <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={1} />
-                        <SettingsField icon={<EyeOff className="w-3.5 h-3.5" />} label={t.additionalLabor} tooltip={t.tooltipAdditionalLabor} value={project.params.additionalLaborCostPerHour} onChange={(v) => updateParams({ additionalLaborCostPerHour: v })} step={1} />
-                        <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
-                        <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
-                        <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
-                        <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
-                        <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
-                        <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
-                        <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Theme */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Theme
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <ThemeToggle />
+                    <span className="text-sm text-foreground font-medium">Light / Dark</span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </>
@@ -902,15 +930,6 @@ function SummaryStat({ icon, bgClass, label, value }: { icon: React.ReactNode; b
 
 function Divider() {
   return <div className="w-px h-6 bg-border/40 shrink-0" />
-}
-
-function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <div className="text-copper">{icon}</div>
-      <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{title}</h2>
-    </div>
-  )
 }
 
 // ─── Settings field ───
@@ -982,7 +1001,7 @@ function PieceCard({
           className="w-3.5 h-3.5 rounded-full shrink-0 border-2"
           style={{ backgroundColor: subPiece.color, borderColor: subPiece.color }}
         />
-        <div className="flex items-center gap-1 flex-1 min-w-0">
+        <div className="flex items-center gap-0.5 flex-1 min-w-0">
           <input
             ref={nameRef}
             type="text"
@@ -1047,9 +1066,9 @@ function PieceCard({
                     onChange={(e) => handleFilamentChange(e.target.value as FilamentType)}
                     className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
                   >
-                    {(Object.entries(FILAMENT_DEFAULTS) as [FilamentType, typeof FILAMENT_DEFAULTS[FilamentType]][]).map(([type, config]) => (
+                    {(Object.entries(FILAMENT_DEFAULTS) as [FilamentType, typeof FILAMENT_DEFAULTS[FilamentType]][]).map(([type]) => (
                       <option key={type} value={type}>
-                        {type === 'Custom' ? t.custom : `${type} — ${config.costPerKg}/kg`}
+                        {type === 'Custom' ? t.custom : type}
                       </option>
                     ))}
                   </select>
@@ -1210,7 +1229,7 @@ function PieceCard({
   )
 }
 
-// ─── Breakdown bar ───
+// ─── Breakdown Bar ───
 function BreakdownBar({ result, currency }: { result: ProjectPricingResult; currency: CurrencyCode }) {
   const total = result.totalProjectPrice
   if (total <= 0) return null
@@ -1233,7 +1252,7 @@ function BreakdownBar({ result, currency }: { result: ProjectPricingResult; curr
             key={i}
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
             style={{ backgroundColor: seg.color, color: pct > 12 ? '#fff' : 'transparent' }}
           >
             {pct > 12 ? `${pct.toFixed(0)}%` : ''}
@@ -1343,73 +1362,244 @@ function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCost
   )
 }
 
-// ─── Generate buyer ticket HTML ───
-function generateBuyerTicket(
+// ─── Generate Producer Report HTML ───
+function generateProducerReport(
   project: Project,
   selectedResult: ProjectPricingResult,
-  tierConfig: typeof PRICING_TIER_CONFIG[PricingTier],
-  date: string
+  tierNameMap: Record<string, string>,
+  t: Record<string, string>
 ) {
+  const now = new Date()
+  const date = now.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
+  const reportId = `RPT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+
+  const printer = project.params.printerModel !== 'custom' ? getPrinterById(project.params.printerModel) : null
+
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>D-Calc — ${project.name}</title>
+  <title>D-Calc — Producer Report — ${project.name}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;color:#1a1a2e;padding:32px;line-height:1.6;max-width:750px;margin:0 auto;font-size:13px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #C77D3A;padding-bottom:16px;margin-bottom:20px}
+    .logo{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#C77D3A}
+    .logo span{color:#6B9E72}
+    .report-type{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
+    .report-id{font-family:'Space Grotesk',monospace;font-size:11px;color:#6B6572;text-align:right}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#C77D3A;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #E8E2DA}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .item{padding:8px 12px;background:#f8f6f3;border-radius:8px}
+    .item-label{font-size:10px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px}
+    .item-value{font-family:'Space Grotesk',monospace;font-weight:600;font-size:14px;color:#1a1a2e}
+    .piece-section{margin:16px 0;padding:12px;border:1px solid #E8E2DA;border-radius:10px}
+    .piece-header{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#1a1a2e;margin-bottom:8px}
+    .cost-row{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;font-size:12px}
+    .cost-row.alt{background:#f8f6f3;border-radius:4px}
+    .cost-row .label{color:#6B6572}
+    .cost-row .value{font-family:'Space Grotesk',monospace;font-weight:600;color:#1a1a2e}
+    .cost-row.bold .label{font-weight:700;color:#1a1a2e}
+    .cost-row.bold .value{font-weight:700;color:#C77D3A}
+    .cost-row.highlight{background:#C77D3A10;border-radius:6px;padding:6px 8px;margin-top:4px}
+    .cost-row.highlight .label{font-weight:700;color:#1a1a2e}
+    .cost-row.highlight .value{font-weight:700;color:#C77D3A;font-size:14px}
+    .total-bar{text-align:center;padding:16px;background:#C77D3A10;border-radius:12px;margin-top:20px}
+    .total-label{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1px}
+    .total-price{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#C77D3A;margin-top:4px}
+    .footer{margin-top:24px;text-align:center;font-size:10px;color:#6B6572;border-top:1px solid #E8E2DA;padding-top:12px}
+    .param-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+    .param-item{padding:6px 10px;background:#f8f6f3;border-radius:6px;font-size:11px}
+    .param-item .pl{font-size:9px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px}
+    .param-item .pv{font-family:'Space Grotesk',monospace;font-weight:600;font-size:12px;color:#1a1a2e}
+    @media print{body{padding:20px}}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">D-<span>Calc</span></div>
+      <div class="report-type">${t.producerReportTitle}</div>
+    </div>
+    <div>
+      <div class="report-id">${reportId}</div>
+      <div style="font-size:11px;color:#6B6572">${date}</div>
+    </div>
+  </div>
+
+  <h2>${t.projectSummary}</h2>
+  <div class="grid">
+    <div class="item"><div class="item-label">Project</div><div class="item-value">${project.name}</div></div>
+    <div class="item"><div class="item-label">${t.saleType}</div><div class="item-value">${project.saleType === 'wholesale' ? t.wholesale : project.saleType === 'retail' ? t.retail : project.saleType === 'custom' ? t.customSale : t.rush}</div></div>
+    <div class="item"><div class="item-label">Tier</div><div class="item-value">${tierNameMap[selectedResult.tier]}</div></div>
+    <div class="item"><div class="item-label">Margin</div><div class="item-value">${(selectedResult.profitMargin * 100).toFixed(0)}%</div></div>
+  </div>
+
+  <h2>${t.printParametersLabel}</h2>
+  <div class="param-grid">
+    <div class="param-item"><div class="pl">Printer</div><div class="pv">${printer ? printer.model : 'Custom'}</div></div>
+    <div class="param-item"><div class="pl">${t.printerCost}</div><div class="pv">${formatCurrency(project.params.printerCost, project.currency)}</div></div>
+    <div class="param-item"><div class="pl">${t.printerLifespan}</div><div class="pv">${project.params.printerLifespanHours}h</div></div>
+    <div class="param-item"><div class="pl">${t.powerConsumption}</div><div class="pv">${project.params.powerConsumptionWatts}W</div></div>
+    <div class="param-item"><div class="pl">${t.electricityCost}</div><div class="pv">${project.params.electricityCostPerKWh}</div></div>
+    <div class="param-item"><div class="pl">${t.laborRate}</div><div class="pv">${formatCurrency(project.params.laborCostPerHour, project.currency)}/h</div></div>
+    <div class="param-item"><div class="pl">${t.maintenance}</div><div class="pv">${formatCurrency(project.params.maintenanceCostPerHour, project.currency)}/h</div></div>
+    <div class="param-item"><div class="pl">${t.failureRate}</div><div class="pv">${project.params.failureRate}%</div></div>
+    <div class="param-item"><div class="pl">${t.overhead}</div><div class="pv">${project.params.overheadPercentage}%</div></div>
+    <div class="param-item"><div class="pl">${t.taxRate}</div><div class="pv">${project.params.taxRate}%</div></div>
+    <div class="param-item"><div class="pl">${t.packaging}</div><div class="pv">${formatCurrency(project.params.packagingCostPerProject, project.currency)}</div></div>
+    <div class="param-item"><div class="pl">${t.shipping}</div><div class="pv">${formatCurrency(project.params.shippingCostPerProject, project.currency)}</div></div>
+  </div>
+
+  <h2>${t.subpieceBreakdown}</h2>
+  ${selectedResult.subPieceBreakdowns.map(b => `
+  <div class="piece-section">
+    <div class="piece-header">${b.subPieceName} ×${b.quantity}</div>
+    <div class="cost-row"><span class="label">${t.materialWithWaste}</span><span class="value">${formatCurrency(b.materialCost, project.currency)}</span></div>
+    <div class="cost-row alt"><span class="label">${t.printerDepreciation}</span><span class="value">${formatCurrency(b.printerDepreciation, project.currency)}</span></div>
+    <div class="cost-row"><span class="label">${t.electricity}</span><span class="value">${formatCurrency(b.electricityCost, project.currency)}</span></div>
+    <div class="cost-row alt"><span class="label">${t.maintenanceCost}</span><span class="value">${formatCurrency(b.maintenanceCost, project.currency)}</span></div>
+    <div class="cost-row"><span class="label">${t.labor}</span><span class="value">${formatCurrency(b.laborCost, project.currency)}</span></div>
+    <div class="cost-row alt"><span class="label">${t.finishing}</span><span class="value">${formatCurrency(b.finishingCost, project.currency)}</span></div>
+    <div class="cost-row"><span class="label">${t.failureRisk}</span><span class="value">${formatCurrency(b.failureCost, project.currency)}</span></div>
+    <div class="cost-row bold"><span class="label">${t.subtotal}</span><span class="value">${formatCurrency(b.subtotalPerUnit, project.currency)}</span></div>
+    <div class="cost-row"><span class="label">${t.overheadCost}</span><span class="value">${formatCurrency(b.overheadPerUnit, project.currency)}</span></div>
+    <div class="cost-row bold"><span class="label">${t.baseCost}</span><span class="value">${formatCurrency(b.baseCostPerUnit, project.currency)}</span></div>
+    <div class="cost-row"><span class="label">${t.profitPerUnit}</span><span class="value">${formatCurrency(b.profitPerUnit, project.currency)}</span></div>
+    <div class="cost-row bold"><span class="label">${t.totalPerUnit}</span><span class="value">${formatCurrency(b.totalPerUnit, project.currency)}</span></div>
+    <div class="cost-row highlight"><span class="label">${t.totalForQty.replace('{qty}', String(b.quantity))}</span><span class="value">${formatCurrency(b.totalForQuantity, project.currency)}</span></div>
+  </div>`).join('')}
+
+  <h2>${t.projectTotal}</h2>
+  <div class="grid">
+    <div class="item"><div class="item-label">${t.totalMaterial}</div><div class="item-value">${formatCurrency(selectedResult.totalMaterialCost, project.currency)}</div></div>
+    <div class="item"><div class="item-label">${t.totalBase}</div><div class="item-value">${formatCurrency(selectedResult.totalBaseCost, project.currency)}</div></div>
+    <div class="item"><div class="item-label">${t.totalProfitLabel}</div><div class="item-value">${formatCurrency(selectedResult.totalProfit, project.currency)}</div></div>
+    <div class="item"><div class="item-label">${t.priceBeforeTax}</div><div class="item-value">${formatCurrency(selectedResult.totalPriceBeforeTax, project.currency)}</div></div>
+    <div class="item"><div class="item-label">${t.taxIncluded}</div><div class="item-value">${formatCurrency(selectedResult.totalTax, project.currency)}</div></div>
+    ${(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) ? `
+    <div class="item"><div class="item-label">${t.packagingAndShipping}</div><div class="item-value">${formatCurrency(selectedResult.totalPackaging + selectedResult.totalShipping, project.currency)}</div></div>` : ''}
+  </div>
+  <div class="total-bar">
+    <div class="total-label">${t.projectTotal}</div>
+    <div class="total-price">${formatCurrency(selectedResult.totalProjectPrice, project.currency)}</div>
+  </div>
+
+  <div class="footer">${t.generatedBy} · ${date}</div>
+</body>
+</html>`
+}
+
+// ─── Generate Invoice HTML ───
+function generateInvoice(
+  project: Project,
+  selectedResult: ProjectPricingResult,
+  t: Record<string, string>
+) {
+  const now = new Date()
+  const date = now.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
+  const invoiceNumber = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+  const subtotal = selectedResult.totalPriceBeforeTax
+  const tax = selectedResult.totalTax
+  const packagingShipping = selectedResult.totalPackaging + selectedResult.totalShipping
+  const total = selectedResult.totalProjectPrice
+
+  const isEs = t.appSubtitle.includes('impresión') || t.appSubtitle.includes('inprimaketa')
+  const invoiceTitle = isEs ? 'Factura' : 'Invoice'
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D-Calc — ${invoiceTitle} — ${project.name}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;color:#1a1a2e;padding:40px;line-height:1.6;max-width:600px;margin:0 auto}
-    .header{text-align:center;border-bottom:3px solid #C77D3A;padding-bottom:20px;margin-bottom:25px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #C77D3A;padding-bottom:20px;margin-bottom:25px}
     .logo{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#C77D3A}
     .logo span{color:#6B9E72}
-    .subtitle{font-size:13px;color:#6B6572;margin-top:4px}
-    .project-name{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1a1a2e;margin:15px 0 5px}
-    .date{font-size:12px;color:#6B6572}
-    .pieces{margin:20px 0}
-    .piece{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #E8E2DA}
-    .piece-name{font-weight:600;font-size:14px}
-    .piece-detail{font-size:11px;color:#6B6572}
-    .piece-price{font-family:'Space Grotesk',monospace;font-weight:700;font-size:16px;color:#C77D3A}
-    .divider{border:none;border-top:2px dashed #E8E2DA;margin:15px 0}
-    .total-section{text-align:center;padding:15px;background:#C77D3A10;border-radius:12px;margin-top:15px}
-    .total-label{font-size:12px;color:#6B6572;text-transform:uppercase;letter-spacing:1px}
-    .total-price{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;color:#C77D3A;margin-top:5px}
-    .includes-iva{font-size:11px;color:#6B9E72;margin-top:4px}
+    .invoice-label{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
+    .invoice-meta{text-align:right;font-size:12px;color:#6B6572}
+    .invoice-meta .inv-num{font-family:'Space Grotesk',monospace;font-weight:700;font-size:14px;color:#1a1a2e}
+    .project-name{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1a1a2e;margin:20px 0 5px}
+    .date-line{font-size:12px;color:#6B6572}
+    table{width:100%;border-collapse:collapse;margin:20px 0}
+    th{text-align:left;font-size:10px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px;border-bottom:2px solid #E8E2DA}
+    th:last-child{text-align:right}
+    td{padding:10px 12px;border-bottom:1px solid #E8E2DA;font-size:13px}
+    td:last-child{text-align:right;font-family:'Space Grotesk',monospace;font-weight:600}
+    .item-name{font-weight:600}
+    .item-detail{font-size:11px;color:#6B6572}
+    .summary-section{margin-top:15px}
+    .summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;font-size:13px}
+    .summary-row.alt{background:#f8f6f3}
+    .summary-row .label{color:#6B6572}
+    .summary-row .value{font-family:'Space Grotesk',monospace;font-weight:600;color:#1a1a2e}
+    .summary-row.total{background:#C77D3A10;border-radius:10px;padding:12px 16px;margin-top:8px}
+    .summary-row.total .label{font-weight:700;color:#1a1a2e;text-transform:uppercase;letter-spacing:0.5px;font-size:11px}
+    .summary-row.total .value{font-weight:700;color:#C77D3A;font-size:20px}
     .footer{margin-top:30px;text-align:center;font-size:11px;color:#6B6572;border-top:1px solid #E8E2DA;padding-top:15px}
     @media print{body{padding:20px}}
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">D-<span>Calc</span></div>
-    <div class="subtitle">Presupuesto de impresión 3D</div>
+    <div>
+      <div class="logo">D-<span>Calc</span></div>
+      <div class="invoice-label">${invoiceTitle}</div>
+    </div>
+    <div class="invoice-meta">
+      <div class="inv-num">${invoiceNumber}</div>
+      <div>${date}</div>
+    </div>
   </div>
-  <div style="text-align:center">
-    <div class="project-name">${project.name}</div>
-    <div class="date">${date}</div>
+
+  <div class="project-name">${project.name}</div>
+  <div class="date-line">${t.validFor30} ${date}</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>${t.projectPieces}</th>
+        <th>${t.quantity}</th>
+        <th>${t.unitPrice}</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${selectedResult.subPieceBreakdowns.map(b => `
+      <tr>
+        <td><div class="item-name">${b.subPieceName}</div><div class="item-detail">${b.subPieceName}</div></td>
+        <td>${b.quantity}</td>
+        <td>${formatCurrency(b.totalPerUnit, project.currency)}</td>
+        <td>${formatCurrency(b.totalForQuantity, project.currency)}</td>
+      </tr>`).join('')}
+      ${(packagingShipping > 0) ? `
+      <tr>
+        <td><div class="item-name">${t.packagingAndShipping}</div></td>
+        <td>1</td>
+        <td>${formatCurrency(packagingShipping, project.currency)}</td>
+        <td>${formatCurrency(packagingShipping, project.currency)}</td>
+      </tr>` : ''}
+    </tbody>
+  </table>
+
+  <div class="summary-section">
+    <div class="summary-row alt"><span class="label">Subtotal</span><span class="value">${formatCurrency(subtotal, project.currency)}</span></div>
+    <div class="summary-row"><span class="label">${t.taxIncluded} (${project.params.taxRate}%)</span><span class="value">${formatCurrency(tax, project.currency)}</span></div>
+    ${packagingShipping > 0 ? `<div class="summary-row alt"><span class="label">${t.packagingAndShipping}</span><span class="value">${formatCurrency(packagingShipping, project.currency)}</span></div>` : ''}
+    <div class="summary-row total">
+      <span class="label">Total</span>
+      <span class="value">${formatCurrency(total, project.currency)}</span>
+    </div>
   </div>
-  <div class="pieces">
-    ${selectedResult.subPieceBreakdowns.map(b => `
-    <div class="piece">
-      <div><div class="piece-name">${b.subPieceName}${b.quantity > 1 ? ` ×${b.quantity}` : ''}</div>
-      <div class="piece-detail">Precio por unidad: ${formatCurrency(b.totalPerUnit, project.currency)}</div></div>
-      <div class="piece-price">${formatCurrency(b.totalForQuantity, project.currency)}</div>
-    </div>`).join('')}
-  </div>
-  <hr class="divider"/>
-  ${(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) ? `
-  <div class="piece"><div><div class="piece-name">Embalaje y envío</div><div class="piece-detail">Gastos de envío y manipulación</div></div>
-  <div class="piece-price">${formatCurrency(selectedResult.totalPackaging + selectedResult.totalShipping, project.currency)}</div></div>
-  <hr class="divider"/>` : ''}
-  <div class="total-section">
-    <div class="total-label">Total del proyecto</div>
-    <div class="total-price">${formatCurrency(selectedResult.totalProjectPrice, project.currency)}</div>
-    <div class="includes-iva">IVA (${project.params.taxRate}%) incluido</div>
-  </div>
-  <div class="footer">Presupuesto generado por D-Calc · Válido 30 días desde ${date}</div>
+
+  <div class="footer">${t.generatedBy} · ${t.validFor30} ${date}</div>
 </body>
 </html>`
 }
 
+// ─── Print / Download helpers ───
 function printHtml(html: string, title: string) {
   const iframe = document.createElement('iframe')
   iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
