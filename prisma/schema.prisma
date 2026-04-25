@@ -20,6 +20,7 @@ model User {
   projects        Project[]
   sales           Sale[]
   printerProfiles PrinterProfile[]
+  sharedReports   SharedReport[]
 }
 
 model Project {
@@ -69,6 +70,21 @@ model PrinterProfile {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SharedReport {
+  id          String    @id @default(cuid())
+  userId      String?   // Optional - can be shared by guests too
+  reportType  String    // "producer" or "invoice"
+  projectData String    // JSON string of the project data
+  pricingData String    // JSON string of the pricing result
+  currency    String    @default("EUR")
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiration
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

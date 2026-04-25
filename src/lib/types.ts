@@ -45,6 +45,9 @@ export interface SubPiece {
   customFinishingDescription: string;
   postProcessingTimeMinutes: number;
   laborTimeMinutes: number;       // Dedicated labor/assembly time (separate from post-processing and supervision)
+  laborCostPerHour: number;       // Hourly labor rate for this piece
+  designTimeMinutes: number;      // Design time for this piece
+  designHourlyRate: number;       // Hourly design rate for this piece
 }
 
 // ─── Project shared params ───
@@ -55,15 +58,12 @@ export interface ProjectParams {
   maintenanceCostPerHour: number;
   powerConsumptionWatts: number;
   electricityCostPerKWh: number;
-  laborCostPerHour: number;       // Rate for post-processing + direct manual work
   supervisionCostPerHour: number; // Rate for passive print supervision (low — ~5% of print time)
   failureRate: number;
   overheadPercentage: number;
   taxRate: number;
   packagingCostPerProject: number;
   shippingCostPerProject: number;
-  designTimeMinutes: number;
-  designHourlyRate: number;
 }
 
 // ─── Project ───
@@ -92,6 +92,7 @@ export interface SubPieceCostBreakdown {
   laborCost: number;
   finishingCost: number;
   failureCost: number;
+  designCost: number;
   subtotalPerUnit: number;
   overheadPerUnit: number;
   baseCostPerUnit: number;
@@ -178,6 +179,7 @@ export function getDefaultSubPiece(): SubPiece {
     quantity: 1, finishingType: 'none', finishingCostPerPiece: 0,
     customFinishingDescription: '', postProcessingTimeMinutes: 0,
     laborTimeMinutes: 0,
+    laborCostPerHour: 15, designTimeMinutes: 0, designHourlyRate: 25,
   };
 }
 
@@ -186,11 +188,9 @@ export function getDefaultProjectParams(): ProjectParams {
     printerProfileId: 'custom',
     printerCost: 300, printerLifespanHours: 5000, maintenanceCostPerHour: 0.10,
     powerConsumptionWatts: 200, electricityCostPerKWh: 0.15,
-    laborCostPerHour: 15,
     supervisionCostPerHour: 5, // Lowered from 12
     failureRate: 5, overheadPercentage: 10, taxRate: 21,
     packagingCostPerProject: 0.50, shippingCostPerProject: 0,
-    designTimeMinutes: 0, designHourlyRate: 25,
   };
 }
 

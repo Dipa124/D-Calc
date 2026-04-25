@@ -10,13 +10,16 @@ import { useToast } from '@/hooks/use-toast'
 import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, FilamentType, FinishingType, PrinterProfile } from '@/lib/types'
 import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, getDefaultPrinterProfile, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, type CurrencyCode } from '@/lib/currency'
+import { LOCALE_NAMES, LOCALE_FLAGS, type Locale } from '@/lib/i18n'
+import { useTheme } from 'next-themes'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
 import { ExportOptions } from '@/components/calculator/export-options'
 import {
   Plus, Printer, Settings, Pencil, Copy, Check, Clock, Weight, Hash, Package,
   Sparkles, Calculator, Layers, DollarSign, X, Save,
   Loader2, LogIn, ShoppingBag, ChevronDown, Zap, Wrench, Percent,
-  Truck, Eye, PenTool, Trash2, FileText, Receipt, UserPlus, RotateCcw
+  Truck, Eye, PenTool, Trash2, FileText, Receipt, UserPlus, RotateCcw,
+  Sun, Moon, Globe, Coins
 } from 'lucide-react'
 
 const formatPrintTime = (hours: number) => {
@@ -129,9 +132,9 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
   const filamentTypes: FilamentType[] = ['PLA', 'PLA+', 'ABS', 'PETG', 'TPU', 'Nylon', 'CarbonFiber', 'WoodFill', 'MetalFill', 'HIPS', 'PVA', 'ASA', 'PC', 'Custom']
 
   return (
-    <motion.div layout className="glass-card overflow-hidden">
+    <motion.div layout className="glass-card overflow-hidden group hover:shadow-md hover:shadow-copper/5 transition-shadow" style={{ borderLeft: `3px solid ${subPiece.color}` }}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 p-4">
-        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: subPiece.color }} />
+        <div className="w-3 h-3 rounded-full shrink-0 transition-transform group-hover:scale-125" style={{ backgroundColor: subPiece.color }} />
         <span className="font-display font-bold text-sm text-foreground flex-1 text-left truncate">{subPiece.name}</span>
         <span className="text-xs text-muted-foreground font-mono">{subPiece.quantity}u · {subPiece.printWeight}g</span>
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -311,7 +314,8 @@ function PrinterProfileModal({ open, onClose, onSave, editProfile, t }: {
 // ═══ CALCULATOR PAGE ═══
 export function CalculatorPage() {
   const { data: session } = useSession()
-  const { t } = useI18n()
+  const { locale, setLocale, t } = useI18n()
+  const { theme, setTheme } = useTheme()
   const { project, setProject, resetProject, hasStoredData } = usePersistedProject()
   const { toast } = useToast()
 
@@ -330,7 +334,9 @@ export function CalculatorPage() {
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [editingProfile, setEditingProfile] = useState<PrinterProfile | null>(null)
   const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([])
+  const [priceGlow, setPriceGlow] = useState(false)
   const projectNameRef = useRef<HTMLInputElement>(null)
+  const prevPriceRef = useRef(selectedResult.totalProjectPrice)
 
   // ─── Calculations ───
   const pricingResults = useMemo(() => calculateProjectPrice(project), [project])
@@ -347,6 +353,16 @@ export function CalculatorPage() {
     () => project.subPieces.reduce((sum, sp) => sum + sp.printWeight * sp.quantity, 0),
     [project.subPieces]
   )
+
+  // ─── Price change animation ───
+  useEffect(() => {
+    if (prevPriceRef.current !== selectedResult.totalProjectPrice) {
+      prevPriceRef.current = selectedResult.totalProjectPrice
+      setPriceGlow(true)
+      const timer = setTimeout(() => setPriceGlow(false), 600)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedResult.totalProjectPrice])
 
   // ─── Load printer profiles ───
   useEffect(() => {
@@ -467,7 +483,7 @@ export function CalculatorPage() {
 
       {/* ═══ SUMMARY BAR ═══ */}
       <div className="glass-card border-b border-border/30 mb-6">
-        <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto py-3 px-1">
+        <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto py-2.5 px-2">
           <div className="flex items-center gap-1.5">
             <div className="w-6 h-6 rounded-md bg-sage/15 flex items-center justify-center"><Hash className="w-3 h-3 text-sage" /></div>
             <div><div className="text-[9px] text-muted-foreground">{t.pieces}</div><div className="font-display font-bold text-sm text-foreground">{totalPieces}</div></div>
@@ -482,17 +498,105 @@ export function CalculatorPage() {
             <div className="w-6 h-6 rounded-md bg-gold/15 flex items-center justify-center"><Weight className="w-3 h-3 text-gold" /></div>
             <div><div className="text-[9px] text-muted-foreground">{t.weight}</div><div className="font-display font-bold text-sm text-foreground">{project.subPieces.length > 0 ? formatWeight(totalWeightGrams) : '—'}</div></div>
           </div>
+
+          {/* Settings row: Currency, Language, Theme */}
+          <div className="w-px h-8 bg-border/50 hidden sm:block" />
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Coins className="w-3 h-3 text-copper/70" />
+              <select
+                value={project.currency}
+                onChange={(e) => setProject(prev => ({ ...prev, currency: e.target.value as CurrencyCode }))}
+                className="compact-select"
+              >
+                {Object.entries(CURRENCIES).map(([code, info]) => (
+                  <option key={code} value={code}>{info.symbol} {code}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <Globe className="w-3 h-3 text-copper/70" />
+              <select
+                value={locale}
+                onChange={(e) => setLocale(e.target.value as Locale)}
+                className="compact-select"
+              >
+                {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
+                  <option key={loc} value={loc}>{LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}</option>
+                ))}
+              </select>
+            </div>
+            <motion.button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-6 h-6 rounded-md bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
+              whileTap={{ scale: 0.85 }}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Moon className="w-3 h-3 text-copper" /> : <Sun className="w-3 h-3 text-gold" />}
+            </motion.button>
+          </div>
+
+          {/* Price display with sparkle + glow */}
           <div className="flex items-center gap-2 ml-auto shrink-0">
-            <div className="flex flex-col leading-tight items-end">
+            <div className="flex flex-col leading-tight items-end price-sparkle">
               <span className="text-[10px] text-muted-foreground">{tierNameMap[selectedResult.tier]}</span>
-              <motion.span key={selectedResult.totalProjectPrice.toFixed(2)} initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="font-display font-extrabold text-xl text-copper">
+              <motion.span
+                key={selectedResult.totalProjectPrice.toFixed(2)}
+                initial={{ scale: 1.08 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                className={`font-display font-extrabold text-xl text-copper ${priceGlow ? 'price-glow' : ''}`}
+              >
                 {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
               </motion.span>
+              {priceGlow && (
+                <>
+                  <span className="sparkle-dot" />
+                  <span className="sparkle-dot" />
+                  <span className="sparkle-dot" />
+                </>
+              )}
             </div>
-            <motion.button onClick={handleCopyPrice} className="w-8 h-8 rounded-lg bg-copper/10 hover:bg-copper/20 flex items-center justify-center transition-colors" whileTap={{ scale: 0.9 }}>
+            <motion.button onClick={handleCopyPrice} className="w-8 h-8 rounded-lg bg-copper/10 hover:bg-copper/20 flex items-center justify-center transition-colors hover:shadow-md hover:shadow-copper/10" whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               {copied ? <Check className="w-3.5 h-3.5 text-sage" /> : <Copy className="w-3.5 h-3.5 text-copper" />}
             </motion.button>
           </div>
+        </div>
+
+        {/* Mobile settings row */}
+        <div className="flex sm:hidden items-center gap-2 px-2 pb-2 pt-0.5 border-t border-border/30">
+          <div className="flex items-center gap-1 flex-1">
+            <Coins className="w-3 h-3 text-copper/70" />
+            <select
+              value={project.currency}
+              onChange={(e) => setProject(prev => ({ ...prev, currency: e.target.value as CurrencyCode }))}
+              className="compact-select flex-1"
+            >
+              {Object.entries(CURRENCIES).map(([code, info]) => (
+                <option key={code} value={code}>{info.symbol} {code}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-1 flex-1">
+            <Globe className="w-3 h-3 text-copper/70" />
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as Locale)}
+              className="compact-select flex-1"
+            >
+              {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
+                <option key={loc} value={loc}>{LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}</option>
+              ))}
+            </select>
+          </div>
+          <motion.button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-6 h-6 rounded-md bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
+            whileTap={{ scale: 0.85 }}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <Moon className="w-3 h-3 text-copper" /> : <Sun className="w-3 h-3 text-gold" />}
+          </motion.button>
         </div>
       </div>
 
@@ -524,9 +628,9 @@ export function CalculatorPage() {
           </div>
 
           {/* Sale type */}
-          <div className="glass-card p-4">
+          <div className="glass-card p-4 section-card">
             <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="w-4 h-4 text-copper" />
+              <div className="w-7 h-7 rounded-lg bg-copper/15 flex items-center justify-center"><DollarSign className="w-3.5 h-3.5 text-copper" /></div>
               <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.saleType}</h2>
               <InfoTooltip text={t.tooltipSaleType} />
             </div>
@@ -562,9 +666,9 @@ export function CalculatorPage() {
           </div>
 
           {/* Printer configuration */}
-          <div className="glass-card p-4 space-y-4">
+          <div className="glass-card p-4 space-y-4 section-card">
             <div className="flex items-center gap-2">
-              <Printer className="w-4 h-4 text-copper" />
+              <div className="w-7 h-7 rounded-lg bg-copper/15 flex items-center justify-center"><Printer className="w-3.5 h-3.5 text-copper" /></div>
               <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2>
               <InfoTooltip text={t.tooltipPrinterModel} />
             </div>
@@ -588,7 +692,6 @@ export function CalculatorPage() {
               <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
               <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
               <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
-              <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
             </div>
             <button onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)} className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full">
               <Settings className="w-3.5 h-3.5" />{advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
@@ -604,19 +707,20 @@ export function CalculatorPage() {
                     <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
                     <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
                     <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
-                    <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
-                    <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
+          {/* Decorative divider */}
+          <div className="section-divider my-2" />
+
           {/* Sub-pieces */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-copper" />
+                <div className="w-7 h-7 rounded-lg bg-copper/15 flex items-center justify-center"><Layers className="w-3.5 h-3.5 text-copper" /></div>
                 <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.projectPieces}</h2>
               </div>
               <motion.button onClick={addSubPiece} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-xs hover:bg-copper-dark hover:shadow-lg hover:shadow-copper/20 transition-all"
@@ -630,13 +734,22 @@ export function CalculatorPage() {
               ))}
             </AnimatePresence>
             {project.subPieces.length === 0 && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper/20 to-gold/10 flex items-center justify-center mb-4"><Package className="w-8 h-8 text-copper/60" /></div>
-                <h3 className="font-display font-bold text-base text-foreground mb-1">{t.noPiecesYet}</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mb-4">{t.noPiecesDesc}</p>
-                <motion.button onClick={addSubPiece} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-sm hover:bg-copper-dark transition-all" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Plus className="w-4 h-4" /> {t.addFirstPiece}
-                </motion.button>
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-copper/5 via-transparent to-gold/5" />
+                <div className="relative z-10">
+                  <motion.div
+                    className="w-20 h-20 rounded-2xl bg-gradient-to-br from-copper/20 to-gold/10 flex items-center justify-center mb-5 mx-auto border border-copper/20"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <Package className="w-9 h-9 text-copper/60" />
+                  </motion.div>
+                  <h3 className="font-display font-bold text-lg text-foreground mb-2">{t.noPiecesYet}</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs mb-5">{t.noPiecesDesc}</p>
+                  <motion.button onClick={addSubPiece} className="btn-shimmer inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-primary-foreground font-display font-semibold text-sm hover:shadow-lg hover:shadow-copper/20 transition-all" whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                    <Plus className="w-4 h-4" /> {t.addFirstPiece}
+                  </motion.button>
+                </div>
               </motion.div>
             )}
           </div>
@@ -659,7 +772,10 @@ export function CalculatorPage() {
 
           {/* Price tier cards */}
           <div>
-            <div className="flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.suggestedPrices}</h2></div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg bg-copper/15 flex items-center justify-center"><Sparkles className="w-3.5 h-3.5 text-copper" /></div>
+              <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.suggestedPrices}</h2>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {pricingResults.map((result) => {
                 const isSelected = project.selectedTier === result.tier
@@ -668,7 +784,7 @@ export function CalculatorPage() {
                 const bgClass = TIER_BG[result.tier]
                 return (
                   <motion.div key={result.tier} layout onClick={() => updateProject({ selectedTier: result.tier })}
-                    className={`relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 ${isSelected ? `${borderClass} ${bgClass} shadow-lg` : 'border-border bg-card hover:border-border/80 hover:shadow-md'}`}
+                    className={`relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 ${isSelected ? `tier-card-active ${bgClass} shadow-lg` : `border-border bg-card hover:border-border/80 hover:shadow-md`}`}
                     whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                     {isSelected && (
                       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
@@ -691,6 +807,7 @@ export function CalculatorPage() {
           </div>
 
           {/* Breakdown bar */}
+          <div className="section-divider my-1" />
           <AnimatePresence mode="wait">
             <motion.div key={project.selectedTier} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }} className="glass-card p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -716,9 +833,9 @@ export function CalculatorPage() {
           </AnimatePresence>
 
           {/* Cost breakdown */}
-          <div className="glass-card overflow-hidden">
-            <button onClick={() => setBreakdownOpen(!breakdownOpen)} className="w-full flex items-center justify-between p-4">
-              <div className="flex items-center gap-2"><Calculator className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.costBreakdown} — {tierNameMap[selectedResult.tier]}</h2></div>
+          <div className="glass-card overflow-hidden section-card">
+            <button onClick={() => setBreakdownOpen(!breakdownOpen)} className="w-full flex items-center justify-between p-4 hover:bg-copper/5 transition-colors">
+              <div className="flex items-center gap-2"><div className="w-7 h-7 rounded-lg bg-copper/15 flex items-center justify-center"><Calculator className="w-3.5 h-3.5 text-copper" /></div><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.costBreakdown} — {tierNameMap[selectedResult.tier]}</h2></div>
               <motion.div animate={{ rotate: breakdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }}><ChevronDown className="w-4 h-4 text-muted-foreground" /></motion.div>
             </button>
             <AnimatePresence>

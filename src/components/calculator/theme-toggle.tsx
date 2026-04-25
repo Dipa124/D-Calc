@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, useCallback } from 'react'
 import { Sun, Moon } from 'lucide-react'
 
 const emptySubscribe = () => () => {}
@@ -14,6 +14,19 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const mounted = useMounted()
 
+  const handleToggle = useCallback(() => {
+    // Add transition class before changing theme for smooth animation
+    document.body.classList.add('theme-transition')
+
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+
+    // Remove transition class after animation completes (500ms)
+    setTimeout(() => {
+      document.body.classList.remove('theme-transition')
+    }, 500)
+  }, [theme, setTheme])
+
   if (!mounted) {
     return <div className="w-12 h-12" />
   }
@@ -22,7 +35,7 @@ export function ThemeToggle() {
 
   return (
     <motion.button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      onClick={handleToggle}
       className="relative w-12 h-12 rounded-full flex items-center justify-center
         bg-secondary/80 hover:bg-secondary border border-border
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper

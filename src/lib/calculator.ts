@@ -63,8 +63,11 @@ export function calculateSubPiecePrice(
   // Supervision cost: passive monitoring at supervision rate × 5% of print time
   const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.05;
 
-  // Labor cost: post-processing + direct manual work at labor rate
-  const laborCost = params.laborCostPerHour * (postProcessingTimeHours + laborTimeHours);
+  // Design cost per piece
+  const designCost = (subPiece.designTimeMinutes / 60) * subPiece.designHourlyRate;
+
+  // Labor cost: post-processing + direct manual work at piece-specific labor rate
+  const laborCost = subPiece.laborCostPerHour * (postProcessingTimeHours + laborTimeHours);
 
   // Finishing cost (per piece, already includes quantity)
   const finishingCost = subPiece.finishingCostPerPiece * subPiece.quantity;
@@ -83,6 +86,7 @@ export function calculateSubPiecePrice(
     supervisionCost +
     laborCost +
     subPiece.finishingCostPerPiece +
+    designCost +
     failureCost;
 
   // Overhead per unit
@@ -121,6 +125,7 @@ export function calculateSubPiecePrice(
     laborCost,
     finishingCost,
     failureCost,
+    designCost,
     subtotalPerUnit,
     overheadPerUnit,
     baseCostPerUnit,
@@ -138,7 +143,6 @@ const ALL_TIERS: PricingTier[] = ['competitive', 'standard', 'premium', 'luxury'
 
 export function calculateProjectPrice(project: Project): ProjectPricingResult[] {
   const { params, saleType, customMultiplier } = project;
-  const designCost = (params.designTimeMinutes / 60) * params.designHourlyRate;
 
   return ALL_TIERS.map((tier) => {
     const tierConfig = PRICING_TIER_CONFIG[tier];
@@ -154,7 +158,7 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
     );
 
     const totalBaseCost =
-      subPieceBreakdowns.reduce((sum, b) => sum + b.baseCostPerUnit * b.quantity, 0) + designCost;
+      subPieceBreakdowns.reduce((sum, b) => sum + b.baseCostPerUnit * b.quantity, 0);
 
     const totalProfit = subPieceBreakdowns.reduce(
       (sum, b) => sum + b.profitPerUnit * b.quantity,

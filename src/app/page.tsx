@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useI18n } from '@/hooks/use-i18n'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast'
 import type { AppPage, Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType, PrinterProfile } from '@/lib/types'
 import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, getDefaultPrinterProfile, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, detectCurrency, type CurrencyCode } from '@/lib/currency'
-import { ThemeToggle } from '@/components/calculator/theme-toggle'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
 import { LOCALE_NAMES, LOCALE_FLAGS, type Locale } from '@/lib/i18n'
 import {
@@ -19,7 +18,7 @@ import {
   Loader2, LogIn, ShoppingBag, ChevronDown, Globe, Coins,
   PenTool, Zap, Wrench, Percent, Truck, Eye, Trash2, FileText, Receipt,
   HomeIcon, BarChart3, UserPlus, User, ArrowRight, Star, Shield, TrendingUp,
-  Cpu, Palette, Code, BookOpen, EyeOff, Menu
+  Cpu, Palette, Code, BookOpen, EyeOff, Menu, Lock, Share2
 } from 'lucide-react'
 
 // ─── Animation variants ───
@@ -107,9 +106,7 @@ function NavBar({ currentPage, onNavigate }: { currentPage: AppPage; onNavigate:
   const { t } = useI18n()
   const { data: session } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const { locale, setLocale, t: tt } = useI18n()
-  const { project, setProject } = usePersistedProject()
+  const { t: tt } = useI18n()
 
   const navItems: { page: AppPage; label: string; icon: React.ReactNode }[] = [
     { page: 'home', label: tt.navHome || 'Home', icon: <HomeIcon className="w-4 h-4" /> },
@@ -168,15 +165,6 @@ function NavBar({ currentPage, onNavigate }: { currentPage: AppPage; onNavigate:
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5">
-            <motion.button
-              onClick={() => setSettingsOpen(true)}
-              className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
-              whileTap={{ scale: 0.9 }}
-              aria-label={t.parameters}
-            >
-              <Settings className="w-3.5 h-3.5 text-muted-foreground" />
-            </motion.button>
-            <ThemeToggle />
             {!session?.user ? (
               <motion.button
                 onClick={() => onNavigate('auth')}
@@ -187,7 +175,7 @@ function NavBar({ currentPage, onNavigate }: { currentPage: AppPage; onNavigate:
                 <span className="hidden sm:inline">{t.login}</span>
               </motion.button>
             ) : (
-              <UserMenu onDashboard={() => onNavigate('dashboard')} />
+              <UserMenu onDashboard={() => onNavigate('dashboard')} onAccountSettings={() => {}} />
             )}
             {/* Mobile menu toggle */}
             <button
@@ -224,77 +212,74 @@ function NavBar({ currentPage, onNavigate }: { currentPage: AppPage; onNavigate:
         </AnimatePresence>
       </header>
 
-      {/* Settings Drawer */}
-      <AnimatePresence>
-        {settingsOpen && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/40" onClick={() => setSettingsOpen(false)} />
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 z-[70] w-80 glass-card border-l border-border/50 p-6 overflow-y-auto"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display font-bold text-lg">{t.parameters}</h2>
-                <button onClick={() => setSettingsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-secondary/80 flex items-center justify-center"><X className="w-4 h-4" /></button>
-              </div>
-
-              {/* Currency */}
-              <div className="mb-5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">{t.currency}</label>
-                <select
-                  value={project.currency}
-                  onChange={(e) => setProject(prev => ({ ...prev, currency: e.target.value as CurrencyCode }))}
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground"
-                >
-                  {Object.entries(CURRENCIES).map(([code, info]) => (
-                    <option key={code} value={code}>{info.symbol} {code} — {info.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Language */}
-              <div className="mb-5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">{t.language}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
-                    <button
-                      key={loc}
-                      onClick={() => setLocale(loc)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all ${locale === loc ? 'border-copper bg-copper/10 text-copper' : 'border-border hover:border-copper/40'}`}
-                    >
-                      {LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Theme */}
-              <div className="mb-5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Theme</label>
-                <div className="flex items-center justify-center p-3">
-                  <ThemeToggle />
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </>
   )
 }
 
-// ─── User Menu ───
-function UserMenu({ onDashboard }: { onDashboard: () => void }) {
+// ─── User Menu with Dropdown ───
+function UserMenu({ onDashboard, onAccountSettings }: { onDashboard: () => void; onAccountSettings: () => void }) {
   const { data: session } = useSession()
+  const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
   if (!session?.user) return null
   const initial = (session.user.name || session.user.email || 'U')[0].toUpperCase()
+
   return (
-    <div className="flex items-center gap-2">
-      <button onClick={onDashboard} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary/80 transition-colors">
+    <div className="relative" ref={menuRef}>
+      <motion.button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary/80 transition-colors"
+        whileTap={{ scale: 0.97 }}
+      >
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-copper to-gold flex items-center justify-center text-[11px] font-bold text-white">{initial}</div>
         <span className="text-sm font-medium text-foreground hidden sm:inline max-w-[120px] truncate">{session.user.name || session.user.email?.split('@')[0]}</span>
-      </button>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-1.5 w-52 glass-card p-1.5 border border-border/50 shadow-lg z-50"
+          >
+            <button
+              onClick={() => { onDashboard(); setOpen(false) }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <BarChart3 className="w-4 h-4 text-copper" />
+              {t.dashboard}
+            </button>
+            <button
+              onClick={() => { onAccountSettings(); setOpen(false) }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Settings className="w-4 h-4 text-muted-foreground" />
+              {t.accountSettings}
+            </button>
+            <div className="h-px bg-border/50 my-1" />
+            <button
+              onClick={() => { signOut(); setOpen(false) }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogIn className="w-4 h-4" />
+              {t.logout}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -336,12 +321,12 @@ function HomePage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-copper/10 border border-copper/20 mb-8">
               <div className="w-2 h-2 rounded-full bg-copper animate-pulse" />
-              <span className="text-sm font-medium text-copper">FDM 3D Printing</span>
+              <span className="text-sm font-medium text-copper">{t.heroBadge}</span>
             </div>
 
             <h1 className="text-hero-xl font-display font-black tracking-tight mb-6">
-              <span className="text-foreground">Calculate with</span><br />
-              <span className="text-gradient-hero">Precision</span>
+              <span className="text-foreground">{t.heroTitlePrefix}</span><br />
+              <span className="text-gradient-hero">{t.heroTitleHighlight}</span>
             </h1>
 
             <p className="text-hero-sub text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -380,10 +365,10 @@ function HomePage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
         <div className="max-w-6xl mx-auto">
           <ScrollReveal className="text-center mb-16">
             <h2 className="text-section-title font-display font-bold mb-4">
-              Everything you <span className="text-gradient-copper">need</span>
+              {t.featuresTitle}
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Professional tools for professional 3D printing businesses
+              {t.featuresSubtitle}
             </p>
           </ScrollReveal>
 
@@ -408,7 +393,7 @@ function HomePage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
         <div className="max-w-5xl mx-auto">
           <ScrollReveal className="text-center mb-16">
             <h2 className="text-section-title font-display font-bold mb-4">
-              How it <span className="text-gradient-copper">works</span>
+              {t.howItWorksTitle}
             </h2>
           </ScrollReveal>
 
@@ -436,10 +421,10 @@ function HomePage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
         <ScrollReveal>
           <div className="max-w-3xl mx-auto text-center glass-card-premium p-12">
             <h2 className="text-hero-md font-display font-bold mb-4">
-              Ready to <span className="text-gradient-copper">price</span> your prints?
+              {t.ctaTitlePrefix} <span className="text-gradient-copper">{t.ctaTitleHighlight}</span> {t.ctaTitleSuffix}
             </h2>
             <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-              Free, no account needed. Start calculating your 3D printing costs in seconds.
+              {t.ctaSubtitle}
             </p>
             <motion.button
               onClick={() => onNavigate('calculator')}
@@ -598,6 +583,7 @@ function CalculatorPage() {
   const [copied, setCopied] = useState(false)
   const [savingProject, setSavingProject] = useState(false)
   const [recordingSale, setRecordingSale] = useState(false)
+  const [sharingReport, setSharingReport] = useState(false)
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
   const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([])
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -717,6 +703,39 @@ function CalculatorPage() {
     }
   }, [printerProfiles, updateParams])
 
+  // ─── Share report ───
+  const handleShareReport = useCallback(async (reportType: 'producer' | 'invoice') => {
+    setSharingReport(true)
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportType,
+          projectData: project,
+          pricingData: selectedResult,
+          currency: project.currency,
+          userId: session?.user?.id || null,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to create shared report')
+      const data = await res.json()
+      const shareUrl = `${window.location.origin}${data.url}`
+      await navigator.clipboard.writeText(shareUrl)
+      toast({
+        title: t.shareLinkCopied || 'Share link copied!',
+        description: shareUrl,
+      })
+    } catch {
+      toast({
+        title: t.errorSharing || 'Failed to share report',
+        variant: 'destructive',
+      })
+    } finally {
+      setSharingReport(false)
+    }
+  }, [project, selectedResult, session?.user?.id, toast, t])
+
   return (
     <motion.main
       className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6 relative z-10"
@@ -830,11 +849,21 @@ function CalculatorPage() {
                   {printerProfiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.model})</option>)}
                 </select>
               </div>
-              <motion.button onClick={() => { setEditingProfile(null); setShowProfileModal(true) }}
-                className="px-3 py-2 rounded-lg bg-copper/10 border border-copper/30 text-copper text-xs font-semibold hover:bg-copper/20 transition-colors flex items-center gap-1.5"
-                whileTap={{ scale: 0.97 }}>
-                <Plus className="w-3.5 h-3.5" /> {t.createProfile || 'New Profile'}
-              </motion.button>
+              <div className="relative">
+                <motion.button
+                  onClick={() => { if (session?.user) { setEditingProfile(null); setShowProfileModal(true) } }}
+                  className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    session?.user
+                      ? 'bg-copper/10 border-copper/30 text-copper hover:bg-copper/20 cursor-pointer'
+                      : 'bg-secondary/50 border-border text-muted-foreground opacity-50 pointer-events-none cursor-not-allowed'
+                  }`}
+                  whileTap={session?.user ? { scale: 0.97 } : undefined}>
+                  {session?.user ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />} {t.createProfile || 'New Profile'}
+                </motion.button>
+                {!session?.user && (
+                  <InfoTooltip text={t.signInToCreateProfiles} side="top" />
+                )}
+              </div>
             </div>
 
             {/* Core parameters grid */}
@@ -844,7 +873,6 @@ function CalculatorPage() {
               <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
               <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
               <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
-              <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
               <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={0.5} />
             </div>
 
@@ -859,15 +887,24 @@ function CalculatorPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
                     <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
                     <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
-                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
-                    <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
-                    <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
-                    <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
-                    <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
+          </motion.section>
+
+          {/* Logistics & Business */}
+          <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-copper" />
+              <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.logisticsBusiness}</h2>
+              <InfoTooltip text={t.tooltipLogisticsBusiness} />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
+              <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
+              <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
+            </div>
           </motion.section>
 
           {/* Sub-pieces */}
@@ -988,16 +1025,28 @@ function CalculatorPage() {
             </AnimatePresence>
           </motion.section>
 
-          {/* Export + Record Sale */}
-          <motion.section variants={sectionVariants} className="flex gap-3">
-            <motion.button onClick={() => generateReport(project, selectedResult, t, 'producer')}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-secondary/80 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
-              <FileText className="w-4 h-4" /> {t.producerReport}
-            </motion.button>
-            <motion.button onClick={() => generateReport(project, selectedResult, t, 'invoice')}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-copper/10 border border-copper/30 text-copper text-sm font-medium hover:bg-copper/20 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
-              <Receipt className="w-4 h-4" /> {t.buyerTicket}
-            </motion.button>
+          {/* Export + Share */}
+          <motion.section variants={sectionVariants} className="space-y-3">
+            <div className="flex gap-3">
+              <motion.button onClick={() => generateReport(project, selectedResult, t, 'producer')}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-secondary/80 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+                <FileText className="w-4 h-4" /> {t.producerReport}
+              </motion.button>
+              <motion.button onClick={() => generateReport(project, selectedResult, t, 'invoice')}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-copper/10 border border-copper/30 text-copper text-sm font-medium hover:bg-copper/20 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+                <Receipt className="w-4 h-4" /> {t.buyerTicket}
+              </motion.button>
+            </div>
+            <div className="flex gap-3">
+              <motion.button onClick={() => handleShareReport('producer')} disabled={sharingReport}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-diamond/10 border border-diamond/30 text-diamond text-sm font-medium hover:bg-diamond/20 transition-colors disabled:opacity-50" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+                {sharingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} {t.shareProducer || 'Share Report'}
+              </motion.button>
+              <motion.button onClick={() => handleShareReport('invoice')} disabled={sharingReport}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sage/10 border border-sage/30 text-sage text-sm font-medium hover:bg-sage/20 transition-colors disabled:opacity-50" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+                {sharingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} {t.shareInvoice || 'Share Invoice'}
+              </motion.button>
+            </div>
           </motion.section>
 
           {session?.user && (
@@ -1239,6 +1288,7 @@ function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCost
     { label: t.maintenanceCost, value: breakdown.maintenanceCost },
     { label: t.labor, value: breakdown.laborCost + breakdown.supervisionCost },
     { label: t.finishing, value: breakdown.finishingCost },
+    { label: t.designCost, value: breakdown.designCost },
     { label: t.failureRisk, value: breakdown.failureCost },
     { label: t.overheadCost, value: breakdown.overheadPerUnit },
     { label: t.profitPerUnit, value: breakdown.profitPerUnit },
@@ -1347,6 +1397,22 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
                 <div>
                   <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.laborTime} <InfoTooltip text={t.tooltipLaborTime} /></label>
                   <input type="number" min={0} step={5} value={subPiece.laborTimeMinutes} onChange={(e) => update({ laborTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+              </div>
+
+              {/* Row 4: Labor Rate + Design */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.pieceLaborRate} <InfoTooltip text={t.tooltipPieceLaborRate} /></label>
+                  <input type="number" min={0} step={1} value={subPiece.laborCostPerHour} onChange={(e) => update({ laborCostPerHour: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.pieceDesignTime} <InfoTooltip text={t.tooltipPieceDesignTime} /></label>
+                  <input type="number" min={0} step={5} value={subPiece.designTimeMinutes} onChange={(e) => update({ designTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.pieceDesignRate} <InfoTooltip text={t.tooltipPieceDesignRate} /></label>
+                  <input type="number" min={0} step={5} value={subPiece.designHourlyRate} onChange={(e) => update({ designHourlyRate: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
                 </div>
               </div>
             </div>
@@ -1477,10 +1543,11 @@ function generateReport(project: Project, result: ProjectPricingResult, t: any, 
 
 // ─── Footer ───
 function Footer() {
+  const { t } = useI18n()
   return (
     <footer className="mt-auto border-t border-border/30 py-4 px-4">
       <div className="max-w-[1400px] mx-auto flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>D-<span className="text-gradient-copper">Calc</span> — Professional FDM 3D Printing Calculator</span>
+        <span>{t.footerText}</span>
         <span>© {new Date().getFullYear()}</span>
       </div>
     </footer>

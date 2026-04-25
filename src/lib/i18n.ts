@@ -322,6 +322,44 @@ export interface Translations {
   welcomeBack: string;
   createYourAccount: string;
   orContinueWith: string;
+
+  // Logistics & Business
+  logisticsBusiness: string;
+  tooltipLogisticsBusiness: string;
+  pieceLaborRate: string;
+  tooltipPieceLaborRate: string;
+  pieceDesignTime: string;
+  tooltipPieceDesignTime: string;
+  pieceDesignRate: string;
+  tooltipPieceDesignRate: string;
+  signInToCreateProfiles: string;
+  designCost: string;
+
+  // Home page extended
+  heroBadge: string;
+  heroTitlePrefix: string;
+  heroTitleHighlight: string;
+  featuresTitle: string;
+  featuresSubtitle: string;
+  howItWorksTitle: string;
+  ctaTitlePrefix: string;
+  ctaTitleHighlight: string;
+  ctaTitleSuffix: string;
+  ctaSubtitle: string;
+  noRegistrationRequired: string;
+  registerBenefits: string;
+  logisticsBusiness: string;
+  designPerPiece: string;
+  laborPerPiece: string;
+  shareReport: string;
+  shareReportDesc: string;
+  accountSettings: string;
+  deleteAccount: string;
+  changeData: string;
+  loginToCreateProfile: string;
+
+  // Settings
+  theme: string;
 }
 
 const translations: Record<Locale, Translations> = {
@@ -572,6 +610,38 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: 'Bienvenido de nuevo',
     createYourAccount: 'Crea tu cuenta',
     orContinueWith: 'O continúa con',
+    logisticsBusiness: 'Logística y Negocio',
+    tooltipLogisticsBusiness: 'Impuestos, embalaje y envío del proyecto.',
+    pieceLaborRate: 'Tarifa mano obra (€/h)',
+    tooltipPieceLaborRate: 'Coste horario de mano de obra para esta pieza (postprocesado + trabajo manual).',
+    pieceDesignTime: 'Diseño (min)',
+    tooltipPieceDesignTime: 'Tiempo dedicado al diseño 3D de esta pieza.',
+    pieceDesignRate: 'Tarifa diseño (€/h)',
+    tooltipPieceDesignRate: 'Tarifa horaria para el tiempo de diseño de esta pieza.',
+    signInToCreateProfiles: 'Inicia sesión para crear perfiles',
+    designCost: 'Coste diseño',
+    heroBadge: 'Impresión 3D FDM',
+    heroTitlePrefix: 'Calcula con',
+    heroTitleHighlight: 'Precisión',
+    featuresTitle: 'Todo lo que necesitas',
+    featuresSubtitle: 'Herramientas profesionales para negocios de impresión 3D',
+    howItWorksTitle: 'Cómo funciona',
+    ctaTitlePrefix: '¿Listo para',
+    ctaTitleHighlight: 'cotizar',
+    ctaTitleSuffix: 'tus impresiones?',
+    ctaSubtitle: 'Gratuito, sin registro obligatorio. Empieza a calcular costes en segundos.',
+    noRegistrationRequired: 'Sin registro obligatorio',
+    registerBenefits: 'Regístrate para acceder al dashboard, guardar proyectos y más',
+    logisticsBusiness: 'Logística y negocio',
+    designPerPiece: 'Diseño por pieza',
+    laborPerPiece: 'Mano de obra por pieza',
+    shareReport: 'Compartir informe',
+    shareReportDesc: 'Genera un enlace para compartir solo la vista del informe',
+    accountSettings: 'Ajustes de cuenta',
+    deleteAccount: 'Eliminar cuenta',
+    changeData: 'Cambiar datos',
+    loginToCreateProfile: 'Inicia sesión para crear perfiles',
+    theme: 'Tema',
   },
   en: {
     appName: 'D-Calc',
@@ -820,6 +890,38 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: 'Welcome back',
     createYourAccount: 'Create your account',
     orContinueWith: 'Or continue with',
+    logisticsBusiness: 'Logistics & Business',
+    tooltipLogisticsBusiness: 'Tax, packaging and shipping costs for the project.',
+    pieceLaborRate: 'Labor rate (€/h)',
+    tooltipPieceLaborRate: 'Hourly labor cost for this piece (post-processing + manual work).',
+    pieceDesignTime: 'Design (min)',
+    tooltipPieceDesignTime: 'Time spent on 3D design for this piece.',
+    pieceDesignRate: 'Design rate (€/h)',
+    tooltipPieceDesignRate: 'Hourly rate for design time of this piece.',
+    signInToCreateProfiles: 'Sign in to create profiles',
+    designCost: 'Design cost',
+    heroBadge: 'FDM 3D Printing',
+    heroTitlePrefix: 'Calculate with',
+    heroTitleHighlight: 'Precision',
+    featuresTitle: 'Everything you need',
+    featuresSubtitle: 'Professional tools for professional 3D printing businesses',
+    howItWorksTitle: 'How it works',
+    ctaTitlePrefix: 'Ready to',
+    ctaTitleHighlight: 'price',
+    ctaTitleSuffix: 'your prints?',
+    ctaSubtitle: 'Free, no registration required. Start calculating costs in seconds.',
+    noRegistrationRequired: 'No registration required',
+    registerBenefits: 'Sign up to access the dashboard, save projects, and more',
+    logisticsBusiness: 'Logistics & Business',
+    designPerPiece: 'Design per piece',
+    laborPerPiece: 'Labor per piece',
+    shareReport: 'Share report',
+    shareReportDesc: 'Generate a link to share only the report view',
+    accountSettings: 'Account settings',
+    deleteAccount: 'Delete account',
+    changeData: 'Change data',
+    loginToCreateProfile: 'Sign in to create profiles',
+    theme: 'Theme',
   },
   zh: {
     appName: 'D-Calc',
@@ -1068,6 +1170,38 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: '欢迎回来',
     createYourAccount: '创建您的账户',
     orContinueWith: '或继续使用',
+    logisticsBusiness: '物流与商务',
+    tooltipLogisticsBusiness: '项目的税费、包装和运输成本。',
+    pieceLaborRate: '人工费率 (€/h)',
+    tooltipPieceLaborRate: '此零件的每小时人工成本（后处理 + 手工工作）。',
+    pieceDesignTime: '设计 (分钟)',
+    tooltipPieceDesignTime: '此零件的3D设计时间。',
+    pieceDesignRate: '设计费率 (€/h)',
+    tooltipPieceDesignRate: '此零件的设计时间每小时费率。',
+    signInToCreateProfiles: '登录以创建配置',
+    designCost: '设计成本',
+    heroBadge: 'FDM 3D打印',
+    heroTitlePrefix: '精确计算',
+    heroTitleHighlight: '精度',
+    featuresTitle: '你需要的一切',
+    featuresSubtitle: '专业3D打印业务工具',
+    howItWorksTitle: '使用方法',
+    ctaTitlePrefix: '准备好',
+    ctaTitleHighlight: '定价',
+    ctaTitleSuffix: '你的打印？',
+    ctaSubtitle: '免费，无需注册。几秒钟内开始计算成本。',
+    noRegistrationRequired: '无需注册',
+    registerBenefits: '注册以访问仪表板、保存项目等',
+    logisticsBusiness: '物流与商业',
+    designPerPiece: '每件设计',
+    laborPerPiece: '每件人工',
+    shareReport: '分享报告',
+    shareReportDesc: '生成链接仅分享报告视图',
+    accountSettings: '账户设置',
+    deleteAccount: '删除账户',
+    changeData: '更改数据',
+    loginToCreateProfile: '登录以创建配置',
+    theme: '主题',
   },
   eu: {
     appName: 'D-Calc',
@@ -1316,6 +1450,38 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: 'Ongi etorri berriro',
     createYourAccount: 'Sortu zure kontua',
     orContinueWith: 'Edo jarraitu honekin',
+    logisticsBusiness: 'Logistika eta Negozioa',
+    tooltipLogisticsBusiness: 'Zergak, paketatzea eta bidalketa proiektuarentzat.',
+    pieceLaborRate: 'Lan tasa (€/h)',
+    tooltipPieceLaborRate: 'Pieza honetako orduko lan kostua (post-prozesaketa + eskuzko lana).',
+    pieceDesignTime: 'Diseinua (min)',
+    tooltipPieceDesignTime: 'Pieza honen 3D diseinuan emandako denbora.',
+    pieceDesignRate: 'Diseinu tasa (€/h)',
+    tooltipPieceDesignRate: 'Pieza honen diseinu denborarako orduko tasa.',
+    signInToCreateProfiles: 'Hasi saioa profilak sortzeko',
+    designCost: 'Diseinu kostua',
+    heroBadge: 'FDM 3D inprimaketa',
+    heroTitlePrefix: 'Kalkulatu',
+    heroTitleHighlight: 'Zehaztasuna',
+    featuresTitle: 'Behar duzun guztia',
+    featuresSubtitle: 'Tresna profesionalak 3D inprimaketa negozioetarako',
+    howItWorksTitle: 'Nola funtzionatzen du',
+    ctaTitlePrefix: 'Prest zaude',
+    ctaTitleHighlight: 'aurreikusteko',
+    ctaTitleSuffix: 'zure inpresioak?',
+    ctaSubtitle: 'Doakoa, erregistrorik gabe. Segundotan hasi kostuak kalkulatzen.',
+    noRegistrationRequired: 'Erregistrorik gabe',
+    registerBenefits: 'Eman izena dashboardera sartu, proiektuak gorde eta gehiagorako',
+    logisticsBusiness: 'Logistika eta negozioa',
+    designPerPiece: 'Diseinua piezako',
+    laborPerPiece: 'Lana piezako',
+    shareReport: 'Partekatu txostena',
+    shareReportDesc: 'Sortu esteka txostenaren ikuspegia soilik partekatzeko',
+    accountSettings: 'Kontu ezarpenak',
+    deleteAccount: 'Ezabatu kontua',
+    changeData: 'Aldatu datuak',
+    loginToCreateProfile: 'Hasi saioa profilak sortzeko',
+    theme: 'Itxura',
     lightSanding: 'Leundu arina',
     fullSanding: 'Leundu osoa',
     primerPaint: 'Zubiloa eta pintura',

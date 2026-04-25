@@ -68,15 +68,6 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
           min={0}
           step={0.01}
         />
-        <ParamField
-          icon={<Clock className="w-3.5 h-3.5" />}
-          label="Mano obra (€/h)"
-          tooltipKey="laborCostPerHour"
-          value={params.laborCostPerHour}
-          onChange={(v) => update({ laborCostPerHour: v })}
-          min={0}
-          step={1}
-        />
       </div>
 
       {/* Advanced toggle */}
@@ -146,24 +137,6 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
                 onChange={(v) => update({ shippingCostPerProject: v })}
                 min={0}
                 step={0.5}
-              />
-              <ParamField
-                icon={<PenTool className="w-3.5 h-3.5" />}
-                label="Diseño (min)"
-                tooltipKey="designTimeMinutes"
-                value={params.designTimeMinutes}
-                onChange={(v) => update({ designTimeMinutes: v })}
-                min={0}
-                step={5}
-              />
-              <ParamField
-                icon={<DollarSign className="w-3.5 h-3.5" />}
-                label="Tarifa diseño (€/h)"
-                tooltipKey="designHourlyRate"
-                value={params.designHourlyRate}
-                onChange={(v) => update({ designHourlyRate: v })}
-                min={0}
-                step={5}
               />
             </div>
           </motion.div>

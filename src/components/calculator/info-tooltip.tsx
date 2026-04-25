@@ -14,7 +14,7 @@ interface InfoTooltipProps {
   side?: 'top' | 'right' | 'bottom' | 'left'
 }
 
-export function InfoTooltip({ text, side = 'top' }: InfoTooltipProps) {
+export function InfoTooltip({ text, side = 'right' }: InfoTooltipProps) {
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
