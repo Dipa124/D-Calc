@@ -262,6 +262,66 @@ export interface Translations {
   
   // Print time
   printTime: string;
+
+  // Navigation
+  navHome: string;
+  navCalculator: string;
+  navDashboard: string;
+
+  // Home page
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCta: string;
+  featureCalc: string;
+  featureCalcDesc: string;
+  featureTiers: string;
+  featureTiersDesc: string;
+  featureProfiles: string;
+  featureProfilesDesc: string;
+  featureProjects: string;
+  featureProjectsDesc: string;
+  featureExport: string;
+  featureExportDesc: string;
+  featureCurrency: string;
+  featureCurrencyDesc: string;
+  step1Title: string;
+  step1Desc: string;
+  step2Title: string;
+  step2Desc: string;
+  step3Title: string;
+  step3Desc: string;
+
+  // Printer profiles
+  printerProfiles: string;
+  createProfile: string;
+  editProfile: string;
+  deleteProfile: string;
+  profileName: string;
+  profileModel: string;
+  profilePrice: string;
+  profileLifespanYears: string;
+  profilePower: string;
+  profileFailureRate: string;
+  profileMaintenance: string;
+  profileDefault: string;
+  profileGeneric: string;
+  noProfilesYet: string;
+  noProfilesDesc: string;
+  createFirstProfile: string;
+
+  // Dashboard page
+  myProjects: string;
+  noProjectsYet: string;
+  loadProject: string;
+  deleteProject: string;
+  apiInfo: string;
+  apiKeyDesc: string;
+  activeProjects: string;
+
+  // Auth page
+  welcomeBack: string;
+  createYourAccount: string;
+  orContinueWith: string;
 }
 
 const translations: Record<Locale, Translations> = {
@@ -349,7 +409,7 @@ const translations: Record<Locale, Translations> = {
     electricityCost: 'Electricidad (€/kWh)',
     laborRate: 'Tarifa mano obra (€/h)',
     supervisionRate: 'Supervisión (€/h)',
-    supervisionDesc: 'Tarifa para supervisión de impresión (15% del tiempo de impresión)',
+    supervisionDesc: 'Tarifa para supervisión de impresión (5% del tiempo de impresión)',
     additionalLabor: 'Labores adicionales (€/h)',
     additionalLaborDesc: 'Tarifa para trabajo manual adicional aparte del postprocesado',
     failureRate: 'Tasa fallo (%)',
@@ -368,7 +428,7 @@ const translations: Record<Locale, Translations> = {
     tooltipPower: 'Consumo eléctrico medio de la impresora durante la impresión en vatios.',
     tooltipElectricity: 'Precio de la electricidad por kilovatio-hora según tu compañía eléctrica.',
     tooltipLaborRate: 'Coste horario de mano de obra para postprocesado y trabajo manual directo.',
-    tooltipSupervision: 'Tarifa para supervisión pasiva de la impresión. Se aplica al 15% del tiempo de impresión (revisión periódica).',
+    tooltipSupervision: 'Tarifa para supervisión pasiva de la impresión. Se aplica al 5% del tiempo de impresión (revisión periódica).',
     tooltipAdditionalLabor: 'Tarifa para labores adicionales como preparación, montaje, ensamblaje, etc. Se aplica al tiempo de mano de obra que asignes a cada pieza.',
     tooltipFailureRate: 'Porcentaje de probabilidad de fallo en la impresión. Se añade como prima de riesgo.',
     tooltipOverhead: 'Porcentaje de gastos generales (alquiler, software, etc.) sobre el coste base.',
@@ -462,6 +522,56 @@ const translations: Record<Locale, Translations> = {
     monthlyBreakdown: 'Desglose mensual',
     salesByTier: 'Ventas por nivel',
     printTime: 'Tiempo de impresión',
+    navHome: 'Inicio',
+    navCalculator: 'Calculadora',
+    navDashboard: 'Panel',
+    heroTitle: 'D-Calc',
+    heroSubtitle: 'La calculadora profesional de impresión 3D que necesitas',
+    heroCta: 'Empezar a calcular',
+    featureCalc: 'Cálculo preciso',
+    featureCalcDesc: 'Costes de material, energía, depreciación y mano de obra con precisión industrial',
+    featureTiers: '4 niveles de precio',
+    featureTiersDesc: 'Competitivo, Estándar, Premium y Lujo con márgenes ajustables',
+    featureProfiles: 'Perfiles de impresora',
+    featureProfilesDesc: 'Guarda las especificaciones de tus impresoras para reutilización rápida',
+    featureProjects: 'Gestión de proyectos',
+    featureProjectsDesc: 'Guarda, carga y organiza tus proyectos de impresión 3D',
+    featureExport: 'Exportación PDF',
+    featureExportDesc: 'Genera reportes de productor y facturas profesionales',
+    featureCurrency: 'Multi-moneda',
+    featureCurrencyDesc: 'EUR, USD, GBP, CNY y 6 monedas más con detección automática',
+    step1Title: 'Configura',
+    step1Desc: 'Introduce los parámetros de tu impresora y los costes operativos',
+    step2Title: 'Añade piezas',
+    step2Desc: 'Define cada pieza con material, tiempo, peso y acabado',
+    step3Title: 'Obtén precios',
+    step3Desc: 'Elige tu nivel de precio y exporta el presupuesto',
+    printerProfiles: 'Perfiles de impresora',
+    createProfile: 'Crear perfil',
+    editProfile: 'Editar perfil',
+    deleteProfile: 'Eliminar perfil',
+    profileName: 'Nombre del perfil',
+    profileModel: 'Modelo',
+    profilePrice: 'Precio de compra',
+    profileLifespanYears: 'Vida útil (años)',
+    profilePower: 'Consumo (W)',
+    profileFailureRate: 'Tasa fallo (%)',
+    profileMaintenance: 'Mant. (€/h)',
+    profileDefault: 'Perfil por defecto',
+    profileGeneric: 'Genérica',
+    noProfilesYet: 'Sin perfiles todavía',
+    noProfilesDesc: 'Crea tu primer perfil de impresora para reutilizar sus parámetros',
+    createFirstProfile: 'Crear primer perfil',
+    myProjects: 'Mis proyectos',
+    noProjectsYet: 'Sin proyectos guardados',
+    loadProject: 'Cargar proyecto',
+    deleteProject: 'Eliminar proyecto',
+    apiInfo: 'Información API',
+    apiKeyDesc: 'Usa la API REST de D-Calc para integrar el cálculo en tus propias aplicaciones',
+    activeProjects: 'Proyectos activos',
+    welcomeBack: 'Bienvenido de nuevo',
+    createYourAccount: 'Crea tu cuenta',
+    orContinueWith: 'O continúa con',
   },
   en: {
     appName: 'D-Calc',
@@ -547,7 +657,7 @@ const translations: Record<Locale, Translations> = {
     electricityCost: 'Electricity (€/kWh)',
     laborRate: 'Labor rate (€/h)',
     supervisionRate: 'Supervision (€/h)',
-    supervisionDesc: 'Rate for print supervision (15% of print time)',
+    supervisionDesc: 'Rate for print supervision (5% of print time)',
     additionalLabor: 'Additional labor (€/h)',
     additionalLaborDesc: 'Rate for additional manual work besides post-processing',
     failureRate: 'Failure rate (%)',
@@ -566,7 +676,7 @@ const translations: Record<Locale, Translations> = {
     tooltipPower: 'Average power consumption during printing in watts.',
     tooltipElectricity: 'Electricity price per kilowatt-hour from your utility company.',
     tooltipLaborRate: 'Hourly labor cost for post-processing and direct manual work.',
-    tooltipSupervision: 'Rate for passive print supervision. Applied to 15% of print time (periodic checking).',
+    tooltipSupervision: 'Rate for passive print supervision. Applied to 5% of print time (periodic checking).',
     tooltipAdditionalLabor: 'Rate for additional tasks like preparation, assembly, etc. Applied to the labor time you assign to each piece.',
     tooltipFailureRate: 'Probability percentage of print failure. Added as a risk premium.',
     tooltipOverhead: 'Overhead percentage (rent, software, etc.) on base cost.',
@@ -660,6 +770,56 @@ const translations: Record<Locale, Translations> = {
     monthlyBreakdown: 'Monthly breakdown',
     salesByTier: 'Sales by tier',
     printTime: 'Print time',
+    navHome: 'Home',
+    navCalculator: 'Calculator',
+    navDashboard: 'Dashboard',
+    heroTitle: 'D-Calc',
+    heroSubtitle: 'The professional 3D printing calculator you need',
+    heroCta: 'Start calculating',
+    featureCalc: 'Precise calculation',
+    featureCalcDesc: 'Material, energy, depreciation and labor costs with industrial precision',
+    featureTiers: '4 pricing tiers',
+    featureTiersDesc: 'Competitive, Standard, Premium and Luxury with adjustable margins',
+    featureProfiles: 'Printer profiles',
+    featureProfilesDesc: 'Save your printer specs for quick reuse across projects',
+    featureProjects: 'Project management',
+    featureProjectsDesc: 'Save, load and organize your 3D printing projects',
+    featureExport: 'PDF export',
+    featureExportDesc: 'Generate producer reports and professional invoices',
+    featureCurrency: 'Multi-currency',
+    featureCurrencyDesc: 'EUR, USD, GBP, CNY and 6 more currencies with auto-detection',
+    step1Title: 'Configure',
+    step1Desc: 'Enter your printer parameters and operational costs',
+    step2Title: 'Add pieces',
+    step2Desc: 'Define each piece with material, time, weight and finishing',
+    step3Title: 'Get prices',
+    step3Desc: 'Choose your pricing tier and export the quote',
+    printerProfiles: 'Printer profiles',
+    createProfile: 'Create profile',
+    editProfile: 'Edit profile',
+    deleteProfile: 'Delete profile',
+    profileName: 'Profile name',
+    profileModel: 'Model',
+    profilePrice: 'Purchase price',
+    profileLifespanYears: 'Lifespan (years)',
+    profilePower: 'Power (W)',
+    profileFailureRate: 'Failure rate (%)',
+    profileMaintenance: 'Maint. (€/h)',
+    profileDefault: 'Default profile',
+    profileGeneric: 'Generic',
+    noProfilesYet: 'No profiles yet',
+    noProfilesDesc: 'Create your first printer profile to reuse its parameters',
+    createFirstProfile: 'Create first profile',
+    myProjects: 'My projects',
+    noProjectsYet: 'No saved projects',
+    loadProject: 'Load project',
+    deleteProject: 'Delete project',
+    apiInfo: 'API info',
+    apiKeyDesc: 'Use the D-Calc REST API to integrate calculations into your own apps',
+    activeProjects: 'Active projects',
+    welcomeBack: 'Welcome back',
+    createYourAccount: 'Create your account',
+    orContinueWith: 'Or continue with',
   },
   zh: {
     appName: 'D-Calc',
@@ -745,7 +905,7 @@ const translations: Record<Locale, Translations> = {
     electricityCost: '电费 (€/kWh)',
     laborRate: '人工费率 (€/h)',
     supervisionRate: '监控费率 (€/h)',
-    supervisionDesc: '打印监控费率（打印时间的15%）',
+    supervisionDesc: '打印监控费率（打印时间的5%）',
     additionalLabor: '额外人工 (€/h)',
     additionalLaborDesc: '除后处理外的额外手工工作费率',
     failureRate: '失败率 (%)',
@@ -764,7 +924,7 @@ const translations: Record<Locale, Translations> = {
     tooltipPower: '打印过程中的平均功耗（瓦）。',
     tooltipElectricity: '电力公司每千瓦时的电价。',
     tooltipLaborRate: '后处理和直接手工工作的每小时人工成本。',
-    tooltipSupervision: '被动打印监控费率。适用于打印时间的15%（定期检查）。',
+    tooltipSupervision: '被动打印监控费率。适用于打印时间的5%（定期检查）。',
     tooltipAdditionalLabor: '准备、组装等额外工作的费率。适用于分配给每个零件的劳动时间。',
     tooltipFailureRate: '打印失败的概率百分比。作为风险溢价添加。',
     tooltipOverhead: '基础成本上的间接费用百分比（租金、软件等）。',
@@ -858,6 +1018,56 @@ const translations: Record<Locale, Translations> = {
     monthlyBreakdown: '月度明细',
     salesByTier: '按级别销售',
     printTime: '打印时间',
+    navHome: '首页',
+    navCalculator: '计算器',
+    navDashboard: '仪表板',
+    heroTitle: 'D-Calc',
+    heroSubtitle: '您需要的专业3D打印计算器',
+    heroCta: '开始计算',
+    featureCalc: '精确计算',
+    featureCalcDesc: '材料、能源、折旧和人工成本，工业级精度',
+    featureTiers: '4个价格层级',
+    featureTiersDesc: '竞争力、标准、优质和豪华，可调利润率',
+    featureProfiles: '打印机配置',
+    featureProfilesDesc: '保存打印机规格，在项目中快速复用',
+    featureProjects: '项目管理',
+    featureProjectsDesc: '保存、加载和组织您的3D打印项目',
+    featureExport: 'PDF导出',
+    featureExportDesc: '生成生产者报告和专业发票',
+    featureCurrency: '多货币',
+    featureCurrencyDesc: '欧元、美元、英镑、人民币等10种货币，自动检测',
+    step1Title: '配置',
+    step1Desc: '输入打印机参数和运营成本',
+    step2Title: '添加零件',
+    step2Desc: '定义每个零件的材料、时间、重量和表面处理',
+    step3Title: '获取价格',
+    step3Desc: '选择价格层级并导出报价',
+    printerProfiles: '打印机配置',
+    createProfile: '创建配置',
+    editProfile: '编辑配置',
+    deleteProfile: '删除配置',
+    profileName: '配置名称',
+    profileModel: '型号',
+    profilePrice: '购买价格',
+    profileLifespanYears: '使用寿命（年）',
+    profilePower: '功耗 (W)',
+    profileFailureRate: '失败率 (%)',
+    profileMaintenance: '维护 (€/h)',
+    profileDefault: '默认配置',
+    profileGeneric: '通用',
+    noProfilesYet: '暂无配置',
+    noProfilesDesc: '创建您的第一个打印机配置以复用参数',
+    createFirstProfile: '创建第一个配置',
+    myProjects: '我的项目',
+    noProjectsYet: '暂无保存的项目',
+    loadProject: '加载项目',
+    deleteProject: '删除项目',
+    apiInfo: 'API信息',
+    apiKeyDesc: '使用D-Calc REST API将计算功能集成到您的应用中',
+    activeProjects: '活跃项目',
+    welcomeBack: '欢迎回来',
+    createYourAccount: '创建您的账户',
+    orContinueWith: '或继续使用',
   },
   eu: {
     appName: 'D-Calc',
@@ -943,7 +1153,7 @@ const translations: Record<Locale, Translations> = {
     electricityCost: 'Elektrizitatea (€/kWh)',
     laborRate: 'Lan tarifa (€/h)',
     supervisionRate: 'Gainbegiraketa (€/h)',
-    supervisionDesc: 'Inprimaketa gainbegiratzeko tarifa (inprimaketa denboraren %15a)',
+    supervisionDesc: 'Inprimaketa gainbegiratzeko tarifa (inprimaketa denboraren %5a)',
     additionalLabor: 'Lan gehigarria (€/h)',
     additionalLaborDesc: 'Post-prozesaketaz gaineko lan gehigarriaren tarifa',
     failureRate: 'Hutsegite tasa (%)',
@@ -962,7 +1172,7 @@ const translations: Record<Locale, Translations> = {
     tooltipPower: 'Inprimaketa bitarteko batez besteko kontsumoa wAttotan.',
     tooltipElectricity: 'Zure konpainia elektrikoaren kWh-ko prezioa.',
     tooltipLaborRate: 'Post-prozesaketarako eta lan zuzenerako orduko lan kostua.',
-    tooltipSupervision: 'Gainbegiraketa pasiboaren tarifa. Inprimaketa denboraren %15ari aplikatzen zaio.',
+    tooltipSupervision: 'Gainbegiraketa pasiboaren tarifa. Inprimaketa denboraren %5ari aplikatzen zaio.',
     tooltipAdditionalLabor: 'Prestaketa, muntaketa eta abarretarako tarifa. Pieza bakoitzari esleitzen diozun lan denborari aplikatzen zaio.',
     tooltipFailureRate: 'Inprimaketa hutsegitearen probabilitate portzentaia. Prima gisa gehitzen da.',
     tooltipOverhead: 'Oinarrizko kostuaren gaineko gainkostu portzentaia (alokairua, softwarea, etab.).',
@@ -1056,6 +1266,56 @@ const translations: Record<Locale, Translations> = {
     monthlyBreakdown: 'Hilabeteko zehaztapena',
     salesByTier: 'Mailen araberako salmentak',
     printTime: 'Inprimaketa denbora',
+    navHome: 'Hasiera',
+    navCalculator: 'Kalkulagailua',
+    navDashboard: 'Arbela',
+    heroTitle: 'D-Calc',
+    heroSubtitle: 'Behar duzun 3D inprimaketa kalkulagailu profesionala',
+    heroCta: 'Hasier kalkulatzen',
+    featureCalc: 'Kalkulu zehatza',
+    featureCalcDesc: 'Material, energia, amortizazio eta lan kostuak zehaztasun industrialekin',
+    featureTiers: '4 prezio maila',
+    featureTiersDesc: 'Lehiakorra, Estandarra, Premium eta Luxuzkoa marjina doigarriekin',
+    featureProfiles: 'Inprimagailu profilak',
+    featureProfilesDesc: 'Gorde zure inprimagailu espezifikazioak proiektuetan berrerabiltzeko',
+    featureProjects: 'Proiektuen kudeaketa',
+    featureProjectsDesc: 'Gorde, kargatu eta antolatu zure 3D inprimaketa proiektuak',
+    featureExport: 'PDF esportazioa',
+    featureExportDesc: 'Sortu ekoizle txostenak eta faktura profesionalak',
+    featureCurrency: 'Dibisa anitz',
+    featureCurrencyDesc: 'EUR, USD, GBP, CNY eta 6 dibisa gehiago detekzio automatikoarekin',
+    step1Title: 'Konfiguratu',
+    step1Desc: 'Sartu zure inprimagailu parametroak eta kostu operatiboak',
+    step2Title: 'Gehitu piezak',
+    step2Desc: 'Definitu pieza bakoitza material, denbora, pisu eta akaberarekin',
+    step3Title: 'Lortu prezioak',
+    step3Desc: 'Aukeratu prezio maila eta esportatu aurrekontua',
+    printerProfiles: 'Inprimagailu profilak',
+    createProfile: 'Sortu profila',
+    editProfile: 'Editatu profila',
+    deleteProfile: 'Ezabatu profila',
+    profileName: 'Profil izena',
+    profileModel: 'Modeloa',
+    profilePrice: 'Erosketa prezioa',
+    profileLifespanYears: 'Bizitza (urte)',
+    profilePower: 'Kontsumoa (W)',
+    profileFailureRate: 'Hutsegite tasa (%)',
+    profileMaintenance: 'Mant. (€/h)',
+    profileDefault: 'Profil lehenetsia',
+    profileGeneric: 'Generikoa',
+    noProfilesYet: 'Oraindik profilik ez',
+    noProfilesDesc: 'Sortu zure lehen inprimagailu profila parametroak berrerabiltzeko',
+    createFirstProfile: 'Sortu lehen profila',
+    myProjects: 'Nire proiektuak',
+    noProjectsYet: 'Gordetako proiekturik ez',
+    loadProject: 'Kargatu proiektua',
+    deleteProject: 'Ezabatu proiektua',
+    apiInfo: 'API informazioa',
+    apiKeyDesc: 'Erabili D-Calc REST APIa kalkuluak zure aplikazioetan integratzeko',
+    activeProjects: 'Proiektu aktiboak',
+    welcomeBack: 'Ongi etorri berriro',
+    createYourAccount: 'Sortu zure kontua',
+    orContinueWith: 'Edo jarraitu honekin',
     lightSanding: 'Leundu arina',
     fullSanding: 'Leundu osoa',
     primerPaint: 'Zubiloa eta pintura',

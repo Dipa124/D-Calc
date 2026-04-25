@@ -1,29 +1,35 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { useI18n } from '@/hooks/use-i18n'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
 import { useToast } from '@/hooks/use-toast'
-import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType } from '@/lib/types'
-import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS } from '@/lib/types'
+import type { AppPage, Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType, PrinterProfile } from '@/lib/types'
+import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, getDefaultPrinterProfile, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, detectCurrency, type CurrencyCode } from '@/lib/currency'
-import { PRINTER_DATABASE, getPrintersByBrand, getPrinterById } from '@/lib/printers'
 import { ThemeToggle } from '@/components/calculator/theme-toggle'
-import { AuthPanel } from '@/components/calculator/auth-panel'
-import { Dashboard } from '@/components/calculator/dashboard'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
 import { LOCALE_NAMES, LOCALE_FLAGS, type Locale } from '@/lib/i18n'
 import {
   Plus, Printer, Settings, Pencil, Copy, Check, Clock, Weight, Hash, Package,
   RotateCcw, Sparkles, Calculator, Layers, DollarSign, FileDown, X, Save,
-  Loader2, LogIn, ShoppingBag, ChevronDown, ChevronRight, Globe, Coins,
-  PenTool, Zap, Wrench, Percent, Truck, Eye, EyeOff, Trash2, FileText, Receipt
+  Loader2, LogIn, ShoppingBag, ChevronDown, Globe, Coins,
+  PenTool, Zap, Wrench, Percent, Truck, Eye, Trash2, FileText, Receipt,
+  HomeIcon, BarChart3, UserPlus, User, ArrowRight, Star, Shield, TrendingUp,
+  Cpu, Palette, Code, BookOpen, EyeOff, Menu
 } from 'lucide-react'
 
 // ─── Animation variants ───
+const pageVariants = {
+  enter: { opacity: 0, x: 20 },
+  center: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 },
+}
+const pageTransition = { duration: 0.35, ease: [0.16, 1, 0.3, 1] }
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.08 } },
@@ -59,29 +65,544 @@ const SALE_TYPE_ICONS: Record<SaleType, React.ReactNode> = {
   rush: <Zap className="w-4 h-4" />,
 }
 
-// ─── Main Page ───
-export default function Home() {
+// ─── Intersection Observer Hook for Scroll Animations ───
+function useScrollReveal() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.unobserve(el) } },
+      { threshold: 0.15 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return { ref, isVisible }
+}
+
+// ─── ScrollReveal Wrapper ───
+function ScrollReveal({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const { ref, isVisible } = useScrollReveal()
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 30 }}
+      animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+      transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// ═══════════════════════════════════════════
+// NAVBAR
+// ═══════════════════════════════════════════
+function NavBar({ currentPage, onNavigate }: { currentPage: AppPage; onNavigate: (p: AppPage) => void }) {
+  const { t } = useI18n()
+  const { data: session } = useSession()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { locale, setLocale, t: tt } = useI18n()
+  const { project, setProject } = usePersistedProject()
+
+  const navItems: { page: AppPage; label: string; icon: React.ReactNode }[] = [
+    { page: 'home', label: tt.navHome || 'Home', icon: <HomeIcon className="w-4 h-4" /> },
+    { page: 'calculator', label: tt.navCalculator || 'Calculator', icon: <Calculator className="w-4 h-4" /> },
+    ...(session?.user ? [{ page: 'dashboard' as AppPage, label: tt.navDashboard || 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }] : []),
+  ]
+
+  return (
+    <>
+      <header className="sticky top-0 z-50 glass-card border-b border-border/50">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+          {/* Logo */}
+          <motion.button
+            onClick={() => onNavigate('home')}
+            className="flex items-center gap-2.5 shrink-0 group"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-copper to-gold flex items-center justify-center shadow-lg shadow-copper/20 group-hover:shadow-copper/40 transition-shadow">
+              <Printer className="w-4.5 h-4.5 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="font-display font-extrabold text-lg leading-tight">
+                D-<span className="text-gradient-copper">Calc</span>
+              </h1>
+            </div>
+          </motion.button>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navItems.map(({ page, label, icon }) => (
+              <motion.button
+                key={page}
+                onClick={() => onNavigate(page)}
+                className={`
+                  relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+                  ${currentPage === page
+                    ? 'text-copper bg-copper/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'
+                  }
+                `}
+                whileTap={{ scale: 0.97 }}
+              >
+                {icon}
+                {label}
+                {currentPage === page && (
+                  <motion.div
+                    layoutId="nav-indicator"
+                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-copper to-gold"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+              </motion.button>
+            ))}
+          </nav>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-1.5">
+            <motion.button
+              onClick={() => setSettingsOpen(true)}
+              className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
+              whileTap={{ scale: 0.9 }}
+              aria-label={t.parameters}
+            >
+              <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+            </motion.button>
+            <ThemeToggle />
+            {!session?.user ? (
+              <motion.button
+                onClick={() => onNavigate('auth')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-copper to-copper-dark text-white text-xs font-semibold hover:shadow-lg hover:shadow-copper/20 transition-all"
+                whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t.login}</span>
+              </motion.button>
+            ) : (
+              <UserMenu onDashboard={() => onNavigate('dashboard')} />
+            )}
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center"
+            >
+              <Menu className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile nav */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-t border-border/50 overflow-hidden"
+            >
+              <div className="px-4 py-2 space-y-1">
+                {navItems.map(({ page, label, icon }) => (
+                  <button
+                    key={page}
+                    onClick={() => { onNavigate(page); setMobileMenuOpen(false) }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page ? 'text-copper bg-copper/10' : 'text-muted-foreground hover:bg-secondary/80'}`}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* Settings Drawer */}
+      <AnimatePresence>
+        {settingsOpen && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/40" onClick={() => setSettingsOpen(false)} />
+            <motion.div
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 z-[70] w-80 glass-card border-l border-border/50 p-6 overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display font-bold text-lg">{t.parameters}</h2>
+                <button onClick={() => setSettingsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-secondary/80 flex items-center justify-center"><X className="w-4 h-4" /></button>
+              </div>
+
+              {/* Currency */}
+              <div className="mb-5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">{t.currency}</label>
+                <select
+                  value={project.currency}
+                  onChange={(e) => setProject(prev => ({ ...prev, currency: e.target.value as CurrencyCode }))}
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground"
+                >
+                  {Object.entries(CURRENCIES).map(([code, info]) => (
+                    <option key={code} value={code}>{info.symbol} {code} — {info.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language */}
+              <div className="mb-5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">{t.language}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
+                    <button
+                      key={loc}
+                      onClick={() => setLocale(loc)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all ${locale === loc ? 'border-copper bg-copper/10 text-copper' : 'border-border hover:border-copper/40'}`}
+                    >
+                      {LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Theme */}
+              <div className="mb-5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Theme</label>
+                <div className="flex items-center justify-center p-3">
+                  <ThemeToggle />
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+// ─── User Menu ───
+function UserMenu({ onDashboard }: { onDashboard: () => void }) {
+  const { data: session } = useSession()
+  if (!session?.user) return null
+  const initial = (session.user.name || session.user.email || 'U')[0].toUpperCase()
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={onDashboard} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary/80 transition-colors">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-copper to-gold flex items-center justify-center text-[11px] font-bold text-white">{initial}</div>
+        <span className="text-sm font-medium text-foreground hidden sm:inline max-w-[120px] truncate">{session.user.name || session.user.email?.split('@')[0]}</span>
+      </button>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════
+// HOME PAGE
+// ═══════════════════════════════════════════
+function HomePage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
+  const { t } = useI18n()
+
+  const features = [
+    { icon: <Calculator className="w-6 h-6" />, title: t.featureCalc || 'Precise Calculation', desc: t.featureCalcDesc || 'Material, energy, depreciation, labor — all calculated automatically' },
+    { icon: <Star className="w-6 h-6" />, title: t.featureTiers || '4 Pricing Tiers', desc: t.featureTiersDesc || 'Competitive, Standard, Premium, and Luxury pricing strategies' },
+    { icon: <Printer className="w-6 h-6" />, title: t.featureProfiles || 'Printer Profiles', desc: t.featureProfilesDesc || 'Create custom printer profiles with your own specs' },
+    { icon: <Layers className="w-6 h-6" />, title: t.featureProjects || 'Project Manager', desc: t.featureProjectsDesc || 'Save, load, and manage multiple projects' },
+    { icon: <FileDown className="w-6 h-6" />, title: t.featureExport || 'PDF Export', desc: t.featureExportDesc || 'Generate professional invoices and producer reports' },
+    { icon: <Coins className="w-6 h-6" />, title: t.featureCurrency || 'Multi-Currency', desc: t.featureCurrencyDesc || '10 currencies with auto-detection' },
+  ]
+
+  const steps = [
+    { num: '01', title: t.step1Title || 'Configure', desc: t.step1Desc || 'Set your printer, material, and project parameters', icon: <Settings className="w-5 h-5" /> },
+    { num: '02', title: t.step2Title || 'Add Pieces', desc: t.step2Desc || 'Define each piece with weight, time, and finishing', icon: <Layers className="w-5 h-5" /> },
+    { num: '03', title: t.step3Title || 'Get Price', desc: t.step3Desc || 'Instantly see 4 pricing tiers and export reports', icon: <DollarSign className="w-5 h-5" /> },
+  ]
+
+  return (
+    <div className="flex-1">
+      {/* Hero */}
+      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+        {/* Mesh gradient background */}
+        <div className="mesh-gradient-bg">
+          <div className="mesh-blob-1" />
+          <div className="mesh-blob-2" />
+          <div className="mesh-blob-3" />
+          <div className="mesh-blob-4" />
+        </div>
+
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-copper/10 border border-copper/20 mb-8">
+              <div className="w-2 h-2 rounded-full bg-copper animate-pulse" />
+              <span className="text-sm font-medium text-copper">FDM 3D Printing</span>
+            </div>
+
+            <h1 className="text-hero-xl font-display font-black tracking-tight mb-6">
+              <span className="text-foreground">Calculate with</span><br />
+              <span className="text-gradient-hero">Precision</span>
+            </h1>
+
+            <p className="text-hero-sub text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+              {t.appDescription}
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <motion.button
+                onClick={() => onNavigate('calculator')}
+                className="btn-shimmer flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-display font-bold text-base shadow-xl shadow-copper/25 hover:shadow-copper/40 transition-shadow"
+                whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              >
+                {t.navCalculator || 'Open Calculator'}
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+              <motion.button
+                onClick={() => onNavigate('auth')}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-border text-foreground font-display font-semibold text-sm hover:border-copper/40 hover:bg-copper/5 transition-all"
+                whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
+              >
+                <UserPlus className="w-4 h-4" />
+                {t.register}
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* Floating decorative elements */}
+          <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-full max-w-3xl">
+            <div className="h-32 bg-gradient-to-t from-background to-transparent" />
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-24 px-4 relative">
+        <div className="max-w-6xl mx-auto">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-section-title font-display font-bold mb-4">
+              Everything you <span className="text-gradient-copper">need</span>
+            </h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Professional tools for professional 3D printing businesses
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feat, i) => (
+              <ScrollReveal key={i} delay={i * 0.1}>
+                <div className="glass-card-premium p-6 h-full group hover:border-copper/30 transition-all duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-copper/15 to-gold/10 flex items-center justify-center text-copper mb-4 group-hover:scale-110 transition-transform">
+                    {feat.icon}
+                  </div>
+                  <h3 className="font-display font-bold text-base mb-2">{feat.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{feat.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 px-4 bg-secondary/20">
+        <div className="max-w-5xl mx-auto">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-section-title font-display font-bold mb-4">
+              How it <span className="text-gradient-copper">works</span>
+            </h2>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {steps.map((step, i) => (
+              <ScrollReveal key={i} delay={i * 0.15}>
+                <div className="text-center">
+                  <div className="relative mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-copper to-gold flex items-center justify-center text-white mb-5 shadow-lg shadow-copper/20">
+                    {step.icon}
+                    <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-background border-2 border-copper flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-copper">{step.num}</span>
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-24 px-4">
+        <ScrollReveal>
+          <div className="max-w-3xl mx-auto text-center glass-card-premium p-12">
+            <h2 className="text-hero-md font-display font-bold mb-4">
+              Ready to <span className="text-gradient-copper">price</span> your prints?
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
+              Free, no account needed. Start calculating your 3D printing costs in seconds.
+            </p>
+            <motion.button
+              onClick={() => onNavigate('calculator')}
+              className="btn-shimmer inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-display font-bold shadow-xl shadow-copper/25"
+              whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            >
+              {t.navCalculator || 'Open Calculator'} <ArrowRight className="w-5 h-5" />
+            </motion.button>
+          </div>
+        </ScrollReveal>
+      </section>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════
+// AUTH PAGE
+// ═══════════════════════════════════════════
+function AuthPage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
+  const { t } = useI18n()
+  const [isLogin, setIsLogin] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      if (isLogin) {
+        const res = await fetch('/api/auth/callback/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        if (!res.ok) { setError(t.incorrectCredentials); return }
+        window.location.reload()
+      } else {
+        if (password.length < 6) { setError(t.minPassword); return }
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name }),
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error || t.registerError); return }
+        const loginRes = await fetch('/api/auth/callback/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        if (loginRes.ok) { window.location.reload() } else { setIsLogin(true) }
+      }
+    } catch {
+      setError(isLogin ? t.loginError : t.registerError)
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="flex-1 flex items-center justify-center px-4 py-12 relative">
+      <div className="mesh-gradient-bg opacity-30"><div className="mesh-blob-1" /><div className="mesh-blob-2" /></div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md relative z-10"
+      >
+        <div className="glass-card-premium p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-copper to-gold flex items-center justify-center mx-auto mb-4 shadow-lg shadow-copper/20">
+              {isLogin ? <User className="w-6 h-6 text-white" /> : <UserPlus className="w-6 h-6 text-white" />}
+            </div>
+            <h1 className="text-hero-md font-display font-bold">
+              {isLogin ? (t.welcomeBack || t.login) : (t.createYourAccount || t.register)}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              {isLogin ? t.loginDesc : t.registerDesc}
+            </p>
+          </div>
+
+          {/* Toggle */}
+          <div className="flex bg-secondary/50 rounded-lg p-1 mb-6">
+            <button
+              onClick={() => { setIsLogin(true); setError('') }}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+            >{t.login}</button>
+            <button
+              onClick={() => { setIsLogin(false); setError('') }}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${!isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+            >{t.register}</button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">{t.nameOptional}</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t.name} autoComplete="name"
+                  className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper/30" />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">{t.email}</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" required autoComplete={isLogin ? 'email' : 'email'}
+                className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper/30" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1.5 block">{t.password}</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isLogin ? '••••••' : t.minPassword} required minLength={isLogin ? undefined : 6} autoComplete={isLogin ? 'current-password' : 'new-password'}
+                className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper/30" />
+            </div>
+
+            <AnimatePresence>
+              {error && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-sm text-destructive">{error}</motion.p>
+              )}
+            </AnimatePresence>
+
+            <button type="submit" disabled={loading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-display font-bold text-sm shadow-lg shadow-copper/20 hover:shadow-copper/30 transition-shadow disabled:opacity-50">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : isLogin ? t.enter : t.createAccount}
+            </button>
+          </form>
+
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            {isLogin ? t.noAccount : t.hasAccount}{' '}
+            <button onClick={() => { setIsLogin(!isLogin); setError('') }} className="text-copper hover:underline font-medium">
+              {isLogin ? t.register : t.login}
+            </button>
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════
+// CALCULATOR PAGE
+// ═══════════════════════════════════════════
+function CalculatorPage() {
   const { data: session } = useSession()
   const { locale, setLocale, t } = useI18n()
   const tierNameMap: Record<string, string> = {
-    competitive: t.competitive,
-    standard: t.standard,
-    premium: t.premium,
-    luxury: t.luxury,
+    competitive: t.competitive, standard: t.standard, premium: t.premium, luxury: t.luxury,
   }
   const { project, setProject, resetProject, hasStoredData } = usePersistedProject()
   const { toast } = useToast()
 
-  // Local state
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [showDashboard, setShowDashboard] = useState(false)
   const [savingProject, setSavingProject] = useState(false)
   const [recordingSale, setRecordingSale] = useState(false)
-  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(true)
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
+  const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([])
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [editingProfile, setEditingProfile] = useState<PrinterProfile | null>(null)
 
-  // Refs for pencil focus
   const projectNameRef = useRef<HTMLInputElement>(null)
 
   // ─── Calculations ───
@@ -90,18 +611,20 @@ export default function Home() {
     () => pricingResults.find(r => r.tier === project.selectedTier) ?? pricingResults[1],
     [pricingResults, project.selectedTier]
   )
-  const totalPieces = useMemo(
-    () => project.subPieces.reduce((sum, sp) => sum + sp.quantity, 0),
-    [project.subPieces]
-  )
-  const totalPrintTimeHours = useMemo(
-    () => project.subPieces.reduce((sum, sp) => sum + (sp.printTimeHours + sp.printTimeMinutes / 60) * sp.quantity, 0),
-    [project.subPieces]
-  )
-  const totalWeightGrams = useMemo(
-    () => project.subPieces.reduce((sum, sp) => sum + sp.printWeight * sp.quantity, 0),
-    [project.subPieces]
-  )
+  const totalPieces = useMemo(() => project.subPieces.reduce((sum, sp) => sum + sp.quantity, 0), [project.subPieces])
+  const totalPrintTimeHours = useMemo(() => project.subPieces.reduce((sum, sp) => sum + (sp.printTimeHours + sp.printTimeMinutes / 60) * sp.quantity, 0), [project.subPieces])
+  const totalWeightGrams = useMemo(() => project.subPieces.reduce((sum, sp) => sum + sp.printWeight * sp.quantity, 0), [project.subPieces])
+
+  // ─── Load printer profiles ───
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetch('/api/printer-profiles').then(r => r.ok ? r.json() : []).then(setPrinterProfiles).catch(() => {})
+    } else {
+      // Guest: use local storage profiles or default
+      const local = localStorage.getItem('dcalc-printer-profiles')
+      if (local) { try { setPrinterProfiles(JSON.parse(local)) } catch {} }
+    }
+  }, [session?.user?.id])
 
   // ─── Project update helpers ───
   const updateProject = useCallback((partial: Partial<Project>) => {
@@ -114,8 +637,7 @@ export default function Home() {
 
   const addSubPiece = useCallback(() => {
     const n = project.subPieces.length + 1
-    const newPiece: SubPiece = { ...getDefaultSubPiece(), id: generateId(), name: `Piece ${n}` }
-    setProject(prev => ({ ...prev, subPieces: [...prev.subPieces, newPiece] }))
+    setProject(prev => ({ ...prev, subPieces: [...prev.subPieces, { ...getDefaultSubPiece(), id: generateId(), name: `Piece ${n}` }] }))
   }, [project.subPieces.length, setProject])
 
   const updateSubPiece = useCallback((id: string, updated: SubPiece) => {
@@ -144,32 +666,17 @@ export default function Home() {
       const listRes = await fetch('/api/projects')
       if (listRes.ok) {
         const projects = await listRes.json()
-        const existing = projects.find((p: { data: string }) => {
-          try { return JSON.parse(p.data).id === project.id } catch { return false }
-        })
+        const existing = projects.find((p: { data: string }) => { try { return JSON.parse(p.data).id === project.id } catch { return false } })
         if (existing) {
-          const res = await fetch(`/api/projects/${existing.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: project.name, data: project }),
-          })
-          if (!res.ok) throw new Error()
+          await fetch(`/api/projects/${existing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: project.name, data: project }) })
           toast({ title: t.projectUpdated })
         } else {
-          const res = await fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: project.name, data: project }),
-          })
-          if (!res.ok) throw new Error()
+          await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: project.name, data: project }) })
           toast({ title: t.projectSaved })
         }
       }
-    } catch {
-      toast({ title: t.errorSaving, variant: 'destructive' })
-    } finally {
-      setSavingProject(false)
-    }
+    } catch { toast({ title: t.errorSaving, variant: 'destructive' }) }
+    finally { setSavingProject(false) }
   }, [session?.user?.id, project, toast, t])
 
   // ─── Record sale ───
@@ -181,1178 +688,575 @@ export default function Home() {
       let projectId = ''
       if (listRes.ok) {
         const projects = await listRes.json()
-        const existing = projects.find((p: { data: string }) => {
-          try { return JSON.parse(p.data).id === project.id } catch { return false }
-        })
+        const existing = projects.find((p: { data: string }) => { try { return JSON.parse(p.data).id === project.id } catch { return false } })
         if (existing) {
           projectId = existing.id
-          await fetch(`/api/projects/${existing.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: project.name, data: project }),
-          })
+          await fetch(`/api/projects/${existing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: project.name, data: project }) })
         } else {
-          const createRes = await fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: project.name, data: project }),
-          })
+          const createRes = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: project.name, data: project }) })
           if (createRes.ok) projectId = (await createRes.json()).id
         }
       }
       if (!projectId) throw new Error()
-      const saleRes = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          projectName: project.name,
-          tier: project.selectedTier,
-          saleType: project.saleType,
-          quantity: totalPieces,
-          unitPrice: selectedResult.totalProjectPrice / (totalPieces || 1),
-          totalPrice: selectedResult.totalProjectPrice,
-        }),
-      })
-      if (!saleRes.ok) throw new Error()
-      toast({
-        title: t.saleRecorded,
-        description: `${formatCurrency(selectedResult.totalProjectPrice, project.currency)} — ${project.name}`,
-      })
-    } catch {
-      toast({ title: t.errorRecording, variant: 'destructive' })
-    } finally {
-      setRecordingSale(false)
-    }
+      await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, projectName: project.name, tier: project.selectedTier, saleType: project.saleType, quantity: totalPieces, unitPrice: selectedResult.totalProjectPrice / (totalPieces || 1), totalPrice: selectedResult.totalProjectPrice }) })
+      toast({ title: t.saleRecorded, description: `${formatCurrency(selectedResult.totalProjectPrice, project.currency)} — ${project.name}` })
+    } catch { toast({ title: t.errorRecording, variant: 'destructive' }) }
+    finally { setRecordingSale(false) }
   }, [session?.user?.id, project, selectedResult, totalPieces, toast, t])
 
-  // ─── Printer auto-fill ───
-  const handlePrinterSelect = useCallback((printerId: string) => {
-    if (printerId === 'custom') {
-      updateParams({ printerModel: 'custom' })
+  // ─── Printer profile select ───
+  const handlePrinterProfileSelect = useCallback((profileId: string) => {
+    if (profileId === 'custom') {
+      updateParams({ printerProfileId: 'custom' })
       return
     }
-    const printer = getPrinterById(printerId)
-    if (printer) {
-      updateParams({
-        printerModel: printer.id,
-        printerCost: printer.price,
-        printerLifespanHours: printer.lifespanHours,
-        powerConsumptionWatts: printer.powerConsumptionWatts,
-        maintenanceCostPerHour: printer.maintenancePerHour,
-        failureRate: printer.failureRate,
-      })
+    const profile = printerProfiles.find(p => p.id === profileId)
+    if (profile) {
+      const params = printerProfileToParams(profile)
+      updateParams(params)
     }
-  }, [updateParams])
-
-  const printersByBrand = useMemo(() => getPrintersByBrand(), [])
+  }, [printerProfiles, updateParams])
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Ambient glows */}
-      <div className="ambient-glow-1" />
-      <div className="ambient-glow-2" />
-
-      {/* ═══════════ HEADER ═══════════ */}
-      <header className="sticky top-0 z-50 glass-card border-b border-border/50">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
-          {/* Logo + Name */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <motion.div
-              className="w-9 h-9 rounded-xl bg-gradient-to-br from-copper to-gold flex items-center justify-center shadow-lg shadow-copper/20"
-              whileHover={{ rotate: 10 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-            >
-              <Printer className="w-4.5 h-4.5 text-white" />
-            </motion.div>
-            <div className="hidden sm:block">
-              <h1 className="font-display font-extrabold text-lg text-foreground leading-tight">
-                D-<span className="text-gradient-copper">Calc</span>
-              </h1>
-              <p className="text-[10px] text-muted-foreground leading-tight">{t.appSubtitle}</p>
+    <motion.main
+      className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6 relative z-10"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Summary Bar */}
+      <div className="glass-card border border-border/30 rounded-xl p-3 mb-6">
+        <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto">
+          <SummaryStat icon={<Hash className="w-3 h-3 text-sage" />} bgClass="bg-sage/15" label={t.pieces} value={totalPieces.toString()} />
+          <Divider />
+          <SummaryStat icon={<Clock className="w-3 h-3 text-copper" />} bgClass="bg-copper/15" label={t.time} value={project.subPieces.length > 0 ? formatPrintTime(totalPrintTimeHours) : '—'} />
+          <Divider />
+          <SummaryStat icon={<Weight className="w-3 h-3 text-gold" />} bgClass="bg-gold/15" label={t.weight} value={project.subPieces.length > 0 ? formatWeight(totalWeightGrams) : '—'} />
+          <Divider />
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] text-muted-foreground">{tierNameMap[selectedResult.tier]}</span>
+              <motion.span key={selectedResult.totalProjectPrice.toFixed(2)} initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="font-display font-extrabold text-lg text-copper">
+                {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
+              </motion.span>
             </div>
-            <div className="sm:hidden">
-              <h1 className="font-display font-extrabold text-base text-foreground leading-tight">
-                D-<span className="text-gradient-copper">Calc</span>
-              </h1>
-            </div>
-          </div>
-
-          {/* Right: Action buttons */}
-          <div className="flex items-center gap-1.5">
-            {/* Save */}
-            {session?.user && (
-              <motion.button
-                onClick={handleSaveProject}
-                disabled={savingProject}
-                className="w-8 h-8 rounded-lg bg-sage/15 hover:bg-sage/25 border border-sage/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                whileTap={{ scale: 0.9 }}
-                aria-label={t.saveProject}
-                title={t.saveProject}
-              >
-                {savingProject ? <Loader2 className="w-3.5 h-3.5 animate-spin text-sage" /> : <Save className="w-3.5 h-3.5 text-sage" />}
-              </motion.button>
-            )}
-
-            {/* Reset */}
-            {hasStoredData && (
-              <motion.button
-                onClick={resetProject}
-                className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
-                whileTap={{ scale: 0.9 }}
-                aria-label={t.resetProject}
-                title={t.resetProject}
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
-              </motion.button>
-            )}
-
-            {/* Settings gear (only display prefs) */}
-            <motion.button
-              onClick={() => setSettingsOpen(true)}
-              className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
-              whileTap={{ scale: 0.9 }}
-              aria-label={t.parameters}
-              title={t.parameters}
-            >
-              <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+            <motion.button onClick={handleCopyPrice} className="w-7 h-7 rounded-md bg-copper/10 hover:bg-copper/20 flex items-center justify-center transition-colors" whileTap={{ scale: 0.9 }}>
+              <AnimatePresence mode="wait">
+                {copied ? <motion.div key="ck" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}><Check className="w-3.5 h-3.5 text-sage" /></motion.div>
+                  : <motion.div key="cp" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}><Copy className="w-3.5 h-3.5 text-copper" /></motion.div>}
+              </AnimatePresence>
             </motion.button>
-
-            <ThemeToggle />
-            <AuthPanel onDashboardClick={() => setShowDashboard(true)} />
-          </div>
-        </div>
-      </header>
-
-      {/* ═══════════ SUMMARY BAR ═══════════ */}
-      <div className="sticky top-[49px] z-40 glass-card border-b border-border/30">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-2">
-          <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto">
-            <SummaryStat icon={<Hash className="w-3 h-3 text-sage" />} bgClass="bg-sage/15" label={t.pieces} value={totalPieces.toString()} />
-            <Divider />
-            <SummaryStat icon={<Clock className="w-3 h-3 text-copper" />} bgClass="bg-copper/15" label={t.time} value={project.subPieces.length > 0 ? formatPrintTime(totalPrintTimeHours) : '—'} />
-            <Divider />
-            <SummaryStat icon={<Weight className="w-3 h-3 text-gold" />} bgClass="bg-gold/15" label={t.weight} value={project.subPieces.length > 0 ? formatWeight(totalWeightGrams) : '—'} />
-            <Divider />
-            <div className="flex items-center gap-2 ml-auto shrink-0">
-              <div className="flex flex-col leading-tight">
-                <span className="text-[10px] text-muted-foreground">{tierNameMap[selectedResult.tier]}</span>
-                <motion.span
-                  key={selectedResult.totalProjectPrice.toFixed(2)}
-                  initial={{ scale: 1.08 }} animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                  className="font-display font-extrabold text-lg text-copper"
-                >
-                  {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
-                </motion.span>
-              </div>
-              <motion.button
-                onClick={handleCopyPrice}
-                className="w-7 h-7 rounded-md bg-copper/10 hover:bg-copper/20 flex items-center justify-center transition-colors"
-                whileTap={{ scale: 0.9 }}
-                aria-label={t.copyPrice}
-              >
-                <AnimatePresence mode="wait">
-                  {copied ? (
-                    <motion.div key="ck" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                      <Check className="w-3.5 h-3.5 text-sage" />
-                    </motion.div>
-                  ) : (
-                    <motion.div key="cp" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                      <Copy className="w-3.5 h-3.5 text-copper" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* ═══════════ MAIN CONTENT ═══════════ */}
-      <motion.main
-        className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6 relative z-10"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ═══ LEFT COLUMN ═══ */}
+        <div className="lg:col-span-7 space-y-5">
 
-          {/* ═══ LEFT COLUMN ═══ */}
-          <div className="lg:col-span-7 space-y-5">
-
-            {/* Project name */}
-            <motion.section variants={sectionVariants}>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0">
-                  <Layers className="w-4 h-4 text-copper" />
-                </div>
-                <div className="flex items-center flex-1 min-w-0">
-                  <input
-                    ref={projectNameRef}
-                    type="text"
-                    value={project.name}
-                    onChange={(e) => updateProject({ name: e.target.value })}
-                    className="font-display font-extrabold text-xl sm:text-2xl text-foreground bg-transparent border-none outline-none flex-1 min-w-0 placeholder:text-muted-foreground"
-                    placeholder={t.pieceName}
-                  />
-                  <button
-                    onClick={() => { projectNameRef.current?.focus(); projectNameRef.current?.select() }}
-                    className="ml-0.5 p-1 rounded-md hover:bg-secondary/80 transition-colors shrink-0"
-                    aria-label="Edit project name"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* Sale type selector */}
-            <motion.section variants={sectionVariants} className="glass-card section-card p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-4 h-4 text-copper" />
-                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.saleType}</h2>
-                <InfoTooltip text={t.tooltipSaleType} />
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(Object.entries(SALE_TYPE_CONFIG) as [SaleType, typeof SALE_TYPE_CONFIG[SaleType]][]).map(([type, config]) => {
-                  const isSelected = project.saleType === type
-                  return (
-                    <motion.button
-                      key={type}
-                      onClick={() => updateProject({ saleType: type })}
-                      className={`
-                        relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2
-                        transition-all duration-200 cursor-pointer text-center
-                        ${isSelected
-                          ? 'border-copper bg-copper/10 dark:border-copper dark:bg-copper/15 shadow-md shadow-copper/10'
-                          : 'border-border bg-card hover:border-copper/40 hover:bg-copper/5'
-                        }
-                      `}
-                      whileTap={{ scale: 0.97 }}
-                    >
-                      <div className={`${isSelected ? 'text-copper' : 'text-muted-foreground'}`}>
-                        {SALE_TYPE_ICONS[type]}
-                      </div>
-                      <span className="font-display font-semibold text-[11px] leading-tight">
-                        {type === 'wholesale' ? t.wholesale : type === 'retail' ? t.retail : type === 'custom' ? t.customSale : t.rush}
-                      </span>
-                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full
-                        ${type === 'custom' ? 'bg-copper/15 text-copper' : 'bg-secondary text-muted-foreground'}`}
-                      >
-                        {config.subtitle}
-                      </span>
-                    </motion.button>
-                  )
-                })}
-              </div>
-              {/* Custom multiplier */}
-              <AnimatePresence>
-                {project.saleType === 'custom' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-copper/10 border border-copper/20"
-                  >
-                    <label className="text-xs font-medium text-foreground whitespace-nowrap flex items-center gap-1.5">
-                      {t.customize}
-                      <InfoTooltip text={t.tooltipCustomMultiplier} side="right" />
-                    </label>
-                    <input
-                      type="number"
-                      min={0.01}
-                      step={0.1}
-                      value={project.customMultiplier}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value)
-                        if (!isNaN(val) && val > 0) updateProject({ customMultiplier: val })
-                      }}
-                      className="flex-1 max-w-[100px] px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper"
-                    />
-                    <span className="font-mono font-bold text-copper text-sm">
-                      ×{project.customMultiplier.toFixed(1)}
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.section>
-
-            {/* ═══ Printer Configuration (IN MAIN LAYOUT) ═══ */}
-            <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-copper" />
-                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2>
-                <InfoTooltip text={t.tooltipPrinterModel} />
-              </div>
-
-              {/* Printer model selector */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Printer className="w-3.5 h-3.5" /> {t.printerModel}
-                </label>
-                <select
-                  value={project.params.printerModel}
-                  onChange={(e) => handlePrinterSelect(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                >
-                  <option value="custom">{t.printerDefaults}</option>
-                  {Object.entries(printersByBrand).map(([brand, printers]) => (
-                    <optgroup key={brand} label={brand}>
-                      {printers.map(p => (
-                        <option key={p.id} value={p.id}>{p.model}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              {/* Core parameters grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
-                <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
-                <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
-                <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
-                <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
-                <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
-              </div>
-
-              {/* Advanced toggle */}
-              <button
-                onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
-                className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                {advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
-                <motion.div animate={{ rotate: advancedSettingsOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-auto">
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </motion.div>
-              </button>
-
-              <AnimatePresence>
-                {advancedSettingsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
-                      <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={1} />
-                      <SettingsField icon={<EyeOff className="w-3.5 h-3.5" />} label={t.additionalLabor} tooltip={t.tooltipAdditionalLabor} value={project.params.additionalLaborCostPerHour} onChange={(v) => updateParams({ additionalLaborCostPerHour: v })} step={1} />
-                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
-                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
-                      <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
-                      <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
-                      <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
-                      <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
-                      <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.section>
-
-            {/* Sub-pieces */}
-            <motion.section variants={sectionVariants} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-copper" />
-                  <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.projectPieces}</h2>
-                </div>
-                <motion.button
-                  onClick={addSubPiece}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-xs hover:bg-copper-dark hover:shadow-lg hover:shadow-copper/20 transition-all"
-                  whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> {t.add}
-                </motion.button>
-              </div>
-
-              <AnimatePresence mode="popLayout">
-                {project.subPieces.map((sp, index) => (
-                  <PieceCard
-                    key={sp.id}
-                    subPiece={sp}
-                    index={index}
-                    currency={project.currency}
-                    onChange={(updated) => updateSubPiece(sp.id, updated)}
-                    onRemove={() => removeSubPiece(sp.id)}
-                    t={t}
-                  />
-                ))}
-              </AnimatePresence>
-
-              {project.subPieces.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                  className="glass-card p-8 flex flex-col items-center justify-center text-center"
-                >
-                  <div className="relative mb-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper/20 to-gold/10 flex items-center justify-center">
-                      <Package className="w-8 h-8 text-copper/60" />
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-sage/15 flex items-center justify-center">
-                      <Plus className="w-3.5 h-3.5 text-sage" />
-                    </div>
-                  </div>
-                  <h3 className="font-display font-bold text-base text-foreground mb-1">{t.noPiecesYet}</h3>
-                  <p className="text-sm text-muted-foreground max-w-xs mb-4">{t.noPiecesDesc}</p>
-                  <motion.button
-                    onClick={addSubPiece}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-sm hover:bg-copper-dark transition-all"
-                    whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}
-                  >
-                    <Plus className="w-4 h-4" /> {t.addFirstPiece}
-                  </motion.button>
-                </motion.div>
-              )}
-            </motion.section>
-          </div>
-
-          {/* ═══ RIGHT COLUMN ═══ */}
-          <div className="lg:col-span-5 space-y-5">
-
-            {/* Guest banner */}
-            {!session?.user && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-4 border border-copper/20 bg-copper/5"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0 mt-0.5">
-                    <LogIn className="w-4 h-4 text-copper" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{t.saveYourProjects}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{t.saveProjectsDesc}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Price tier cards */}
-            <motion.section variants={sectionVariants}>
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-copper" />
-                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.suggestedPrices}</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {pricingResults.map((result) => {
-                  const isSelected = project.selectedTier === result.tier
-                  const color = TIER_BAR_COLORS[result.tier]
-                  return (
-                    <motion.div
-                      key={result.tier}
-                      layout
-                      onClick={() => updateProject({ selectedTier: result.tier })}
-                      className={`
-                        relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300
-                        ${isSelected
-                          ? 'border-copper bg-copper/10 shadow-lg shadow-copper/10'
-                          : 'border-border bg-card hover:border-border/80 hover:shadow-md'
-                        }
-                      `}
-                      whileHover={{ y: -2, scale: 1.01 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isSelected && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shadow-md text-white"
-                          style={{ backgroundColor: color }}
-                        >
-                          {t.selected}
-                        </motion.div>
-                      )}
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                        <span className={`font-display font-bold text-xs leading-tight ${isSelected ? 'text-copper' : 'text-foreground'}`}>
-                          {tierNameMap[result.tier]}
-                        </span>
-                      </div>
-                      <div className={`font-display font-black text-lg leading-none ${isSelected ? 'text-copper' : 'text-foreground'}`}>
-                        {formatCurrency(result.totalProjectPrice, project.currency)}
-                      </div>
-                      <div className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-[9px] font-bold"
-                        style={{ backgroundColor: `${color}20`, color }}
-                      >
-                        +{(result.profitMargin * 100).toFixed(0)}% {t.margin}
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </motion.section>
-
-            {/* Breakdown bar */}
-            <motion.section variants={sectionVariants}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={project.selectedTier}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3 }}
-                  className="glass-card section-card p-4 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: TIER_BAR_COLORS[project.selectedTier] }} />
-                      <span className="font-display font-bold text-sm text-copper">{tierNameMap[selectedResult.tier]}</span>
-                      <span className="text-muted-foreground text-xs">—</span>
-                      <span className="font-display font-bold text-sm text-foreground">
-                        {formatCurrency(selectedResult.totalProjectPrice, project.currency)}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {t.margin}: {(selectedResult.profitMargin * 100).toFixed(0)}%
-                    </span>
-                  </div>
-
-                  <BreakdownBar result={selectedResult} currency={project.currency} />
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                    <LegendItem color="#6B9E72" label={t.material} value={selectedResult.totalMaterialCost} currency={project.currency} />
-                    <LegendItem color="#4FC3F7" label={t.operation} value={selectedResult.totalBaseCost - selectedResult.totalMaterialCost} currency={project.currency} />
-                    <LegendItem color="#C77D3A" label={t.profit} value={selectedResult.totalProfit} currency={project.currency} />
-                    <LegendItem color="#D4A843" label={t.taxIncluded} value={selectedResult.totalTax} currency={project.currency} />
-                    {(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) && (
-                      <LegendItem color="#8A8690" label={t.shippingPackage} value={selectedResult.totalPackaging + selectedResult.totalShipping} currency={project.currency} />
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-            </motion.section>
-
-            {/* Cost breakdown (collapsible) */}
-            <motion.section variants={sectionVariants} className="glass-card section-card overflow-hidden">
-              <button onClick={() => setBreakdownOpen(!breakdownOpen)} className="w-full flex items-center justify-between p-4">
-                <div className="flex items-center gap-2">
-                  <Calculator className="w-4 h-4 text-copper" />
-                  <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">
-                    {t.costBreakdown} — {tierNameMap[selectedResult.tier]}
-                  </h2>
-                </div>
-                <motion.div animate={{ rotate: breakdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                </motion.div>
-              </button>
-              <AnimatePresence>
-                {breakdownOpen && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                    <div className="px-4 pb-4 max-h-96 overflow-y-auto">
-                      <div className="grid grid-cols-2 gap-2 mb-3">
-                        <BreakdownSummaryItem label={t.totalMaterial} value={selectedResult.totalMaterialCost} currency={project.currency} />
-                        <BreakdownSummaryItem label={t.totalBase} value={selectedResult.totalBaseCost} currency={project.currency} />
-                        <BreakdownSummaryItem label={t.totalProfitLabel} value={selectedResult.totalProfit} currency={project.currency} />
-                        <BreakdownSummaryItem label={t.priceBeforeTax} value={selectedResult.totalPriceBeforeTax} currency={project.currency} />
-                        <BreakdownSummaryItem label={t.taxIncluded} value={selectedResult.totalTax} currency={project.currency} />
-                        <BreakdownSummaryItem label={t.projectTotal} value={selectedResult.totalProjectPrice} currency={project.currency} highlight />
-                      </div>
-                      {selectedResult.subPieceBreakdowns.map(b => (
-                        <SubPieceBreakdown key={b.subPieceId} breakdown={b} currency={project.currency} t={t} />
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.section>
-
-            {/* ═══ Export Section ═══ */}
-            <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <FileDown className="w-4 h-4 text-copper" />
-                <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.exportSection}</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {/* Producer Report */}
-                <motion.button
-                  onClick={() => {
-                    const html = generateProducerReport(project, selectedResult, tierNameMap, t)
-                    printHtml(html, `D-Calc_Report_${project.name}`)
-                  }}
-                  className="flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sage/10 border border-sage/25 text-sage font-display font-semibold text-xs hover:bg-sage/20 hover:shadow-lg hover:shadow-sage/10 transition-all"
-                  whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}
-                >
-                  <FileText className="w-5 h-5" />
-                  {t.producerReport}
-                </motion.button>
-                {/* Invoice */}
-                <motion.button
-                  onClick={() => {
-                    const html = generateInvoice(project, selectedResult, t)
-                    printHtml(html, `D-Calc_Invoice_${project.name}`)
-                  }}
-                  className="flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-xl bg-copper/10 border border-copper/25 text-copper font-display font-semibold text-xs hover:bg-copper/20 hover:shadow-lg hover:shadow-copper/10 transition-all"
-                  whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}
-                >
-                  <Receipt className="w-5 h-5" />
-                  {t.buyerTicket}
-                </motion.button>
-              </div>
-            </motion.section>
-
-            {/* Record Sale */}
-            {session?.user && project.subPieces.length > 0 && (
-              <motion.section variants={sectionVariants}>
-                <motion.button
-                  onClick={handleRecordSale}
-                  disabled={recordingSale}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-sage to-sage/80 text-white font-display font-semibold text-sm hover:shadow-lg hover:shadow-sage/20 transition-all disabled:opacity-50"
-                  whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                >
-                  {recordingSale ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
-                  {t.recordSale}
-                </motion.button>
-              </motion.section>
-            )}
-          </div>
-        </div>
-      </motion.main>
-
-      {/* ═══════════ FOOTER ═══════════ */}
-      <footer className="mt-auto border-t border-border/50 py-3 text-center text-xs text-muted-foreground bg-background/80 backdrop-blur-sm">
-        <p className="font-display">D-<span className="text-copper">Calc</span> — {t.appSubtitle}</p>
-        <p className="mt-0.5 text-[10px]">{t.footerDisclaimer}</p>
-      </footer>
-
-      {/* ═══════════ SETTINGS DRAWER (Currency, Language, Theme ONLY) ═══════════ */}
-      <AnimatePresence>
-        {settingsOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm"
-              onClick={() => setSettingsOpen(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-background border-l border-border shadow-2xl overflow-y-auto"
-            >
-              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-5 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-copper" />
-                  <h2 className="font-display font-bold text-lg text-foreground">{t.parameters}</h2>
-                </div>
-                <button
-                  onClick={() => setSettingsOpen(false)}
-                  className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4 text-muted-foreground" />
+          {/* Project name + save */}
+          <motion.section variants={sectionVariants}>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0"><Layers className="w-4 h-4 text-copper" /></div>
+              <div className="flex items-center flex-1 min-w-0">
+                <input ref={projectNameRef} type="text" value={project.name} onChange={(e) => updateProject({ name: e.target.value })}
+                  className="font-display font-extrabold text-xl sm:text-2xl text-foreground bg-transparent border-none outline-none flex-1 min-w-0 placeholder:text-muted-foreground" placeholder={t.pieceName} />
+                <button onClick={() => { projectNameRef.current?.focus(); projectNameRef.current?.select() }} className="ml-0.5 p-1 rounded-md hover:bg-secondary/80 transition-colors shrink-0" aria-label="Edit name">
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
                 </button>
               </div>
+              {session?.user && (
+                <motion.button onClick={handleSaveProject} disabled={savingProject} className="w-8 h-8 rounded-lg bg-sage/15 hover:bg-sage/25 border border-sage/30 flex items-center justify-center transition-colors disabled:opacity-50" whileTap={{ scale: 0.9 }}>
+                  {savingProject ? <Loader2 className="w-3.5 h-3.5 animate-spin text-sage" /> : <Save className="w-3.5 h-3.5 text-sage" />}
+                </motion.button>
+              )}
+              {hasStoredData && (
+                <motion.button onClick={resetProject} className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border flex items-center justify-center transition-colors" whileTap={{ scale: 0.9 }}>
+                  <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                </motion.button>
+              )}
+            </div>
+          </motion.section>
 
-              <div className="p-5 space-y-6">
-                {/* Currency */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Coins className="w-3.5 h-3.5" /> {t.currency}
-                  </label>
-                  <select
-                    value={project.currency}
-                    onChange={(e) => updateProject({ currency: e.target.value as CurrencyCode })}
-                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                  >
-                    {Object.entries(CURRENCIES).map(([code, info]) => (
-                      <option key={code} value={code}>
-                        {info.symbol} {code} — {info.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Sale type */}
+          <motion.section variants={sectionVariants} className="glass-card section-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="w-4 h-4 text-copper" />
+              <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.saleType}</h2>
+              <InfoTooltip text={t.tooltipSaleType} />
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.entries(SALE_TYPE_CONFIG) as [SaleType, typeof SALE_TYPE_CONFIG[SaleType]][]).map(([type, config]) => {
+                const isSelected = project.saleType === type
+                return (
+                  <motion.button key={type} onClick={() => updateProject({ saleType: type })}
+                    className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer text-center ${isSelected ? 'border-copper bg-copper/10 shadow-md shadow-copper/10' : 'border-border bg-card hover:border-copper/40 hover:bg-copper/5'}`}
+                    whileTap={{ scale: 0.97 }}>
+                    <div className={isSelected ? 'text-copper' : 'text-muted-foreground'}>{SALE_TYPE_ICONS[type]}</div>
+                    <span className="font-display font-semibold text-[11px] leading-tight">{type === 'wholesale' ? t.wholesale : type === 'retail' ? t.retail : type === 'custom' ? t.customSale : t.rush}</span>
+                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full ${type === 'custom' ? 'bg-copper/15 text-copper' : 'bg-secondary text-muted-foreground'}`}>{config.subtitle}</span>
+                  </motion.button>
+                )
+              })}
+            </div>
+            <AnimatePresence>
+              {project.saleType === 'custom' && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-copper/10 border border-copper/20">
+                  <label className="text-xs font-medium text-foreground whitespace-nowrap flex items-center gap-1.5">{t.customize}<InfoTooltip text={t.tooltipCustomMultiplier} side="right" /></label>
+                  <input type="number" min={0.01} step={0.1} value={project.customMultiplier} onChange={(e) => { const val = parseFloat(e.target.value); if (!isNaN(val) && val > 0) updateProject({ customMultiplier: val }) }}
+                    className="flex-1 max-w-[100px] px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                  <span className="font-mono font-bold text-copper text-sm">×{project.customMultiplier.toFixed(1)}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.section>
 
-                {/* Language */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5" /> {t.language}
-                  </label>
-                  <select
-                    value={locale}
-                    onChange={(e) => setLocale(e.target.value as Locale)}
-                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                  >
-                    {Object.entries(LOCALE_NAMES).map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {LOCALE_FLAGS[code as Locale]} {name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Printer Profile */}
+          <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Printer className="w-4 h-4 text-copper" />
+              <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2>
+              <InfoTooltip text={t.tooltipPrinterModel} />
+            </div>
 
-                {/* Theme */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> Theme
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <ThemeToggle />
-                    <span className="text-sm text-foreground font-medium">Light / Dark</span>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                  <Printer className="w-3.5 h-3.5" /> {t.printerModel}
+                </label>
+                <select value={project.params.printerProfileId} onChange={(e) => handlePrinterProfileSelect(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
+                  <option value="custom">{t.printerDefaults}</option>
+                  {printerProfiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.model})</option>)}
+                </select>
+              </div>
+              <motion.button onClick={() => { setEditingProfile(null); setShowProfileModal(true) }}
+                className="px-3 py-2 rounded-lg bg-copper/10 border border-copper/30 text-copper text-xs font-semibold hover:bg-copper/20 transition-colors flex items-center gap-1.5"
+                whileTap={{ scale: 0.97 }}>
+                <Plus className="w-3.5 h-3.5" /> {t.createProfile || 'New Profile'}
+              </motion.button>
+            </div>
+
+            {/* Core parameters grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
+              <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
+              <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
+              <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
+              <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
+              <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.laborRate} tooltip={t.tooltipLaborRate} value={project.params.laborCostPerHour} onChange={(v) => updateParams({ laborCostPerHour: v })} step={1} />
+              <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={0.5} />
+            </div>
+
+            {/* Advanced toggle */}
+            <button onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)} className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full">
+              <Settings className="w-3.5 h-3.5" />{advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
+              <motion.div animate={{ rotate: advancedSettingsOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-auto"><ChevronDown className="w-3.5 h-3.5" /></motion.div>
+            </button>
+            <AnimatePresence>
+              {advancedSettingsOpen && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
+                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
+                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
+                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
+                    <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
+                    <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
+                    <SettingsField icon={<PenTool className="w-3.5 h-3.5" />} label={t.designTime} tooltip={t.tooltipDesignTime} value={project.params.designTimeMinutes} onChange={(v) => updateParams({ designTimeMinutes: v })} step={5} />
+                    <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.designRate} tooltip={t.tooltipDesignRate} value={project.params.designHourlyRate} onChange={(v) => updateParams({ designHourlyRate: v })} step={5} />
                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.section>
+
+          {/* Sub-pieces */}
+          <motion.section variants={sectionVariants} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2"><Layers className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.projectPieces}</h2></div>
+              <motion.button onClick={addSubPiece} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-xs hover:bg-copper-dark hover:shadow-lg hover:shadow-copper/20 transition-all" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                <Plus className="w-3.5 h-3.5" /> {t.add}
+              </motion.button>
+            </div>
+
+            <AnimatePresence mode="popLayout">
+              {project.subPieces.map((sp, index) => (
+                <PieceCard key={sp.id} subPiece={sp} index={index} currency={project.currency} onChange={(updated) => updateSubPiece(sp.id, updated)} onRemove={() => removeSubPiece(sp.id)} t={t} />
+              ))}
+            </AnimatePresence>
+
+            {project.subPieces.length === 0 && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-8 flex flex-col items-center justify-center text-center">
+                <div className="relative mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-copper/20 to-gold/10 flex items-center justify-center"><Package className="w-8 h-8 text-copper/60" /></div>
+                  <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-lg bg-sage/15 flex items-center justify-center"><Plus className="w-3.5 h-3.5 text-sage" /></div>
                 </div>
+                <h3 className="font-display font-bold text-base text-foreground mb-1">{t.noPiecesYet}</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mb-4">{t.noPiecesDesc}</p>
+                <motion.button onClick={addSubPiece} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-copper text-primary-foreground font-display font-semibold text-sm hover:bg-copper-dark transition-all" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                  <Plus className="w-4 h-4" /> {t.addFirstPiece}
+                </motion.button>
+              </motion.div>
+            )}
+          </motion.section>
+        </div>
+
+        {/* ═══ RIGHT COLUMN ═══ */}
+        <div className="lg:col-span-5 space-y-5">
+          {!session?.user && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 border border-copper/20 bg-copper/5">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0 mt-0.5"><LogIn className="w-4 h-4 text-copper" /></div>
+                <div className="flex-1 min-w-0"><p className="text-sm font-medium text-foreground">{t.saveYourProjects}</p><p className="text-xs text-muted-foreground mt-0.5">{t.saveProjectsDesc}</p></div>
               </div>
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          )}
 
-      {/* ═══════════ DASHBOARD OVERLAY ═══════════ */}
+          {/* Price tier cards */}
+          <motion.section variants={sectionVariants}>
+            <div className="flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.suggestedPrices}</h2></div>
+            <div className="grid grid-cols-2 gap-3">
+              {pricingResults.map((result) => {
+                const isSelected = project.selectedTier === result.tier
+                const color = TIER_BAR_COLORS[result.tier]
+                return (
+                  <motion.div key={result.tier} layout onClick={() => updateProject({ selectedTier: result.tier })}
+                    className={`relative cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 ${isSelected ? 'border-copper bg-copper/10 shadow-lg shadow-copper/10' : 'border-border bg-card hover:border-border/80 hover:shadow-md'}`}
+                    whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+                    {isSelected && <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shadow-md text-white" style={{ backgroundColor: color }}>{t.selected}</motion.div>}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className={`font-display font-bold text-xs leading-tight ${isSelected ? 'text-copper' : 'text-foreground'}`}>{tierNameMap[result.tier]}</span>
+                    </div>
+                    <div className={`font-display font-black text-lg leading-none ${isSelected ? 'text-copper' : 'text-foreground'}`}>{formatCurrency(result.totalProjectPrice, project.currency)}</div>
+                    <div className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: `${color}20`, color }}>+{(result.profitMargin * 100).toFixed(0)}% {t.margin}</div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.section>
+
+          {/* Breakdown bar */}
+          <motion.section variants={sectionVariants}>
+            <AnimatePresence mode="wait">
+              <motion.div key={project.selectedTier} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }} className="glass-card section-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: TIER_BAR_COLORS[project.selectedTier] }} />
+                    <span className="font-display font-bold text-sm text-copper">{tierNameMap[selectedResult.tier]}</span>
+                    <span className="text-muted-foreground text-xs">—</span>
+                    <span className="font-display font-bold text-sm text-foreground">{formatCurrency(selectedResult.totalProjectPrice, project.currency)}</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-mono">{t.margin}: {(selectedResult.profitMargin * 100).toFixed(0)}%</span>
+                </div>
+                <BreakdownBar result={selectedResult} currency={project.currency} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  <LegendItem color="#6B9E72" label={t.material} value={selectedResult.totalMaterialCost} currency={project.currency} />
+                  <LegendItem color="#4FC3F7" label={t.operation} value={selectedResult.totalBaseCost - selectedResult.totalMaterialCost} currency={project.currency} />
+                  <LegendItem color="#C77D3A" label={t.profit} value={selectedResult.totalProfit} currency={project.currency} />
+                  <LegendItem color="#D4A843" label={t.taxIncluded} value={selectedResult.totalTax} currency={project.currency} />
+                  {(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) && <LegendItem color="#8A8690" label={t.shippingPackage} value={selectedResult.totalPackaging + selectedResult.totalShipping} currency={project.currency} />}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </motion.section>
+
+          {/* Cost breakdown (collapsible) */}
+          <motion.section variants={sectionVariants} className="glass-card section-card overflow-hidden">
+            <button onClick={() => setBreakdownOpen(!breakdownOpen)} className="w-full flex items-center justify-between p-4">
+              <div className="flex items-center gap-2"><Calculator className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.costBreakdown} — {tierNameMap[selectedResult.tier]}</h2></div>
+              <motion.div animate={{ rotate: breakdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }}><ChevronDown className="w-4 h-4 text-muted-foreground" /></motion.div>
+            </button>
+            <AnimatePresence>
+              {breakdownOpen && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                  <div className="px-4 pb-4 max-h-96 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <BreakdownSummaryItem label={t.totalMaterial} value={selectedResult.totalMaterialCost} currency={project.currency} />
+                      <BreakdownSummaryItem label={t.totalBase} value={selectedResult.totalBaseCost} currency={project.currency} />
+                      <BreakdownSummaryItem label={t.totalProfitLabel} value={selectedResult.totalProfit} currency={project.currency} />
+                      <BreakdownSummaryItem label={t.priceBeforeTax} value={selectedResult.totalPriceBeforeTax} currency={project.currency} />
+                      <BreakdownSummaryItem label={t.taxIncluded} value={selectedResult.totalTax} currency={project.currency} />
+                      <BreakdownSummaryItem label={t.projectTotal} value={selectedResult.totalProjectPrice} currency={project.currency} highlight />
+                    </div>
+                    {selectedResult.subPieceBreakdowns.map((bd) => (
+                      <SubPieceBreakdown key={bd.subPieceId} breakdown={bd} currency={project.currency} t={t} />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.section>
+
+          {/* Export + Record Sale */}
+          <motion.section variants={sectionVariants} className="flex gap-3">
+            <motion.button onClick={() => generateReport(project, selectedResult, t, 'producer')}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-secondary/80 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <FileText className="w-4 h-4" /> {t.producerReport}
+            </motion.button>
+            <motion.button onClick={() => generateReport(project, selectedResult, t, 'invoice')}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-copper/10 border border-copper/30 text-copper text-sm font-medium hover:bg-copper/20 transition-colors" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              <Receipt className="w-4 h-4" /> {t.buyerTicket}
+            </motion.button>
+          </motion.section>
+
+          {session?.user && (
+            <motion.button onClick={handleRecordSale} disabled={recordingSale}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sage to-sage-dark text-white text-sm font-semibold hover:shadow-lg hover:shadow-sage/20 transition-all disabled:opacity-50" whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
+              {recordingSale ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />} {t.recordSale}
+            </motion.button>
+          )}
+        </div>
+      </div>
+
+      {/* Printer Profile Modal */}
       <AnimatePresence>
-        {showDashboard && session?.user && (
-          <Dashboard onClose={() => setShowDashboard(false)} currency={project.currency} />
+        {showProfileModal && (
+          <PrinterProfileModal
+            profile={editingProfile}
+            onClose={() => { setShowProfileModal(false); setEditingProfile(null) }}
+            onSave={async (profile) => {
+              if (session?.user?.id) {
+                if (profile.id && profile.id !== 'custom') {
+                  await fetch(`/api/printer-profiles/${profile.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+                } else {
+                  const res = await fetch('/api/printer-profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+                  if (res.ok) { const newProfile = await res.json(); setPrinterProfiles(prev => [...prev, newProfile]) }
+                }
+                const profiles = await (await fetch('/api/printer-profiles')).json()
+                setPrinterProfiles(profiles)
+              } else {
+                // Guest: save to localStorage
+                const local = [...printerProfiles, { ...profile, id: `local_${Date.now()}` }]
+                setPrinterProfiles(local)
+                localStorage.setItem('dcalc-printer-profiles', JSON.stringify(local))
+              }
+              setShowProfileModal(false); setEditingProfile(null)
+            }}
+            onDelete={async (id) => {
+              if (session?.user?.id) {
+                await fetch(`/api/printer-profiles/${id}`, { method: 'DELETE' })
+              } else {
+                const local = printerProfiles.filter(p => p.id !== id)
+                setPrinterProfiles(local)
+                localStorage.setItem('dcalc-printer-profiles', JSON.stringify(local))
+              }
+              setShowProfileModal(false); setEditingProfile(null)
+            }}
+            t={t}
+          />
         )}
       </AnimatePresence>
+    </motion.main>
+  )
+}
+
+// ═══════════════════════════════════════════
+// DASHBOARD PAGE
+// ═══════════════════════════════════════════
+function DashboardPage({ onNavigate }: { onNavigate: (p: AppPage) => void }) {
+  const { data: session } = useSession()
+  const { t } = useI18n()
+  const [stats, setStats] = useState<any>(null)
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([])
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    const fetchAll = async () => {
+      try {
+        const [statsRes, projRes, profRes] = await Promise.all([
+          fetch('/api/sales/stats'),
+          fetch('/api/projects'),
+          fetch('/api/printer-profiles'),
+        ])
+        if (statsRes.ok) setStats(await statsRes.json())
+        if (projRes.ok) setProjects(await projRes.json())
+        if (profRes.ok) setPrinterProfiles(await profRes.json())
+      } catch {} finally { setLoading(false) }
+    }
+    fetchAll()
+  }, [session?.user?.id])
+
+  if (!session?.user) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="text-center">
+          <h2 className="font-display font-bold text-xl mb-2">{t.login}</h2>
+          <p className="text-muted-foreground mb-4">{t.loginDesc}</p>
+          <button onClick={() => onNavigate('auth')} className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-semibold">{t.enter}</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-copper" /></div>
+
+  const fc = (amount: number) => formatCurrency(amount, 'EUR')
+
+  return (
+    <div className="flex-1 max-w-[1200px] mx-auto w-full px-4 sm:px-6 py-8">
+      <h1 className="font-display font-extrabold text-2xl mb-6">{t.dashboard}</h1>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatCard icon={<DollarSign className="w-5 h-5" />} label={t.totalRevenue} value={fc(stats.totalRevenue)} bgClass="bg-copper/15" iconColor="text-copper" />
+          <StatCard icon={<Layers className="w-5 h-5" />} label={t.totalSales} value={stats.totalSales.toString()} bgClass="bg-sage/15" iconColor="text-sage" />
+          <StatCard icon={<TrendingUp className="w-5 h-5" />} label={t.avgPrice} value={fc(stats.avgPrice)} bgClass="bg-gold/15" iconColor="text-gold" />
+          <StatCard icon={<ShoppingBag className="w-5 h-5" />} label={t.recentSales} value={stats.recentSales?.length.toString() || '0'} bgClass="bg-diamond/15" iconColor="text-diamond" />
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Projects */}
+        <div className="glass-card p-5">
+          <h2 className="font-display font-bold text-sm tracking-wide uppercase mb-4 flex items-center gap-2"><Layers className="w-4 h-4 text-copper" /> {t.myProjects || 'Projects'}</h2>
+          {projects.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">{t.noProjectsYet || 'No projects yet'}</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {projects.map((p: any) => (
+                <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors">
+                  <div className="flex-1 min-w-0"><div className="font-display font-semibold text-sm truncate">{p.name}</div><div className="text-[11px] text-muted-foreground">{new Date(p.updatedAt).toLocaleDateString()}</div></div>
+                  <button onClick={async () => { await fetch(`/api/projects/${p.id}`, { method: 'DELETE' }); setProjects(prev => prev.filter((x: any) => x.id !== p.id)) }} className="w-7 h-7 rounded-md hover:bg-destructive/10 flex items-center justify-center"><Trash2 className="w-3.5 h-3.5 text-destructive/60" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Printer Profiles */}
+        <div className="glass-card p-5">
+          <h2 className="font-display font-bold text-sm tracking-wide uppercase mb-4 flex items-center gap-2"><Printer className="w-4 h-4 text-copper" /> {t.printerProfiles || 'Printer Profiles'}</h2>
+          {printerProfiles.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">{t.noProfilesYet || 'No profiles yet'}</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {printerProfiles.map((p: PrinterProfile) => (
+                <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors">
+                  <div className="flex-1 min-w-0"><div className="font-display font-semibold text-sm truncate">{p.name}</div><div className="text-[11px] text-muted-foreground">{p.model} · {p.price}€</div></div>
+                  {p.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-copper/15 text-copper">Default</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* API Info */}
+        <div className="glass-card p-5 lg:col-span-2">
+          <h2 className="font-display font-bold text-sm tracking-wide uppercase mb-4 flex items-center gap-2"><Code className="w-4 h-4 text-copper" /> {t.apiInfo || 'API Info'}</h2>
+          <div className="bg-background rounded-lg p-4 font-mono text-xs text-muted-foreground border border-border">
+            <p className="text-foreground mb-2">Endpoints:</p>
+            <p>GET  /api/projects</p>
+            <p>POST /api/projects</p>
+            <p>GET  /api/printer-profiles</p>
+            <p>POST /api/printer-profiles</p>
+            <p>GET  /api/sales/stats</p>
+            <p className="mt-2 text-foreground">{t.apiKeyDesc || 'Authentication required via NextAuth session'}</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── Sub-components ──────────────────────────────────────────────
+// ═══════════════════════════════════════════
+// SHARED COMPONENTS
+// ═══════════════════════════════════════════
 
 function SummaryStat({ icon, bgClass, label, value }: { icon: React.ReactNode; bgClass: string; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-1.5 shrink-0">
-      <div className={`w-6 h-6 rounded-md ${bgClass} flex items-center justify-center`}>{icon}</div>
-      <div className="flex flex-col leading-tight">
-        <span className="text-[10px] text-muted-foreground">{label}</span>
-        <span className="font-display font-bold text-sm text-foreground">{value}</span>
-      </div>
+    <div className="flex items-center gap-2 shrink-0">
+      <div className={`w-7 h-7 rounded-md ${bgClass} flex items-center justify-center`}>{icon}</div>
+      <div className="flex flex-col leading-tight"><span className="text-[10px] text-muted-foreground">{label}</span><span className="font-display font-bold text-xs text-foreground">{value}</span></div>
     </div>
   )
 }
 
-function Divider() {
-  return <div className="w-px h-6 bg-border/40 shrink-0" />
-}
+function Divider() { return <div className="w-px h-7 bg-border/50 shrink-0" /> }
 
-// ─── Settings field ───
-function SettingsField({
-  icon, label, tooltip, value, onChange, min = 0, max, step = 1
-}: {
-  icon: React.ReactNode
-  label: string
-  tooltip: string
-  value: number
-  onChange: (v: number) => void
-  min?: number
-  max?: number
-  step?: number
+function SettingsField({ icon, label, tooltip, value, onChange, step = 1, min, max }: {
+  icon: React.ReactNode; label: string; tooltip: string; value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number
 }) {
   return (
-    <div className="space-y-1.5">
-      <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-        {icon} <span className="truncate">{label}</span>
-        {tooltip && <InfoTooltip text={tooltip} />}
+    <div>
+      <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
+        {icon} {label} <InfoTooltip text={tooltip} side="right" />
       </label>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(Math.max(min, parseFloat(e.target.value) || 0))}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-      />
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v) }}
+        className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
     </div>
   )
 }
 
-// ─── Piece Card ───
-function PieceCard({
-  subPiece, index, currency, onChange, onRemove, t
-}: {
-  subPiece: SubPiece
-  index: number
-  currency: CurrencyCode
-  onChange: (updated: SubPiece) => void
-  onRemove: () => void
-  t: Record<string, string>
-}) {
-  const [isExpanded, setIsExpanded] = useState(index === 0)
-  const nameRef = useRef<HTMLInputElement>(null)
-
-  const update = (partial: Partial<SubPiece>) => {
-    onChange({ ...subPiece, ...partial })
-  }
-
-  const handleFilamentChange = (filamentType: FilamentType) => {
-    const defaults = FILAMENT_DEFAULTS[filamentType]
-    update({ filamentType, filamentCostPerKg: defaults.costPerKg })
-  }
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16, scale: 0.95 }}
-      className="glass-card overflow-hidden"
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2 p-3 cursor-pointer select-none" onClick={() => setIsExpanded(!isExpanded)}>
-        <div
-          className="w-3.5 h-3.5 rounded-full shrink-0 border-2"
-          style={{ backgroundColor: subPiece.color, borderColor: subPiece.color }}
-        />
-        <div className="flex items-center gap-0.5 flex-1 min-w-0">
-          <input
-            ref={nameRef}
-            type="text"
-            value={subPiece.name}
-            onChange={(e) => update({ name: e.target.value })}
-            onClick={(e) => e.stopPropagation()}
-            className="font-display font-semibold text-foreground bg-transparent border-none outline-none text-sm min-w-0 truncate"
-            placeholder={t.pieceName}
-          />
-          <button
-            onClick={(e) => { e.stopPropagation(); nameRef.current?.focus() }}
-            className="p-0.5 rounded hover:bg-secondary/80 transition-colors shrink-0"
-            aria-label="Edit piece name"
-          >
-            <Pencil className="w-3 h-3 text-muted-foreground/40" />
-          </button>
-        </div>
-        <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-          {subPiece.filamentType} · {subPiece.printWeight}g
-        </span>
-        <motion.button
-          onClick={(e) => { e.stopPropagation(); onRemove() }}
-          className="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-          whileTap={{ scale: 0.9 }}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </motion.button>
-        <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }} className="shrink-0">
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-        </motion.div>
-      </div>
-
-      {/* Expanded content */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 space-y-3">
-              {/* Color + Filament */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.filamentColor}</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={subPiece.color}
-                      onChange={(e) => update({ color: e.target.value })}
-                      className="w-8 h-8 rounded-lg border-2 border-border cursor-pointer bg-transparent p-0.5"
-                    />
-                    <span className="font-mono text-[10px] text-muted-foreground">{subPiece.color}</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.filamentType}</label>
-                  <select
-                    value={subPiece.filamentType}
-                    onChange={(e) => handleFilamentChange(e.target.value as FilamentType)}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                  >
-                    {(Object.entries(FILAMENT_DEFAULTS) as [FilamentType, typeof FILAMENT_DEFAULTS[FilamentType]][]).map(([type]) => (
-                      <option key={type} value={type}>
-                        {type === 'Custom' ? t.custom : type}
-                      </option>
-                    ))}
-                  </select>
-                  {subPiece.filamentType === 'Custom' && (
-                    <input
-                      type="text"
-                      value={subPiece.customFilamentName}
-                      onChange={(e) => update({ customFilamentName: e.target.value })}
-                      placeholder={t.customFilamentName}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Row 1: Weight | Cost | Hours | Minutes */}
-              <div className="grid grid-cols-4 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.weightGrams}</label>
-                  <input
-                    type="number"
-                    value={subPiece.printWeight}
-                    onChange={(e) => update({ printWeight: Math.max(0, parseFloat(e.target.value) || 0) })}
-                    min={0} step={1}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.costPerKg}</label>
-                  <input
-                    type="number"
-                    value={subPiece.filamentCostPerKg}
-                    onChange={(e) => update({ filamentCostPerKg: Math.max(0, parseFloat(e.target.value) || 0) })}
-                    min={0} step={0.5}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.hours}</label>
-                  <input
-                    type="number"
-                    value={subPiece.printTimeHours}
-                    onChange={(e) => update({ printTimeHours: Math.max(0, parseInt(e.target.value) || 0) })}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.minutes}</label>
-                  <input
-                    type="number"
-                    value={subPiece.printTimeMinutes}
-                    onChange={(e) => update({ printTimeMinutes: Math.max(0, Math.min(59, parseInt(e.target.value) || 0)) })}
-                    min={0} max={59}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Quantity | Waste | Post-processing | Labor */}
-              <div className="grid grid-cols-4 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.quantity}</label>
-                  <input
-                    type="number"
-                    value={subPiece.quantity}
-                    onChange={(e) => update({ quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                    min={1}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.waste}</label>
-                  <input
-                    type="number"
-                    value={subPiece.wastePercentage}
-                    onChange={(e) => update({ wastePercentage: Math.max(0, parseFloat(e.target.value) || 0) })}
-                    min={0} max={100} step={1}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.postProcessing}</label>
-                  <input
-                    type="number"
-                    value={subPiece.postProcessingTimeMinutes}
-                    onChange={(e) => update({ postProcessingTimeMinutes: Math.max(0, parseInt(e.target.value) || 0) })}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{t.laborTime}</label>
-                  <input
-                    type="number"
-                    value={subPiece.laborTimeMinutes ?? 0}
-                    onChange={(e) => update({ laborTimeMinutes: Math.max(0, parseInt(e.target.value) || 0) })}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Finish type */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground">{t.finishType}</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.entries(FINISHING_DEFAULTS) as [FinishingType, typeof FINISHING_DEFAULTS[FinishingType]][]).map(([type, config]) => {
-                    const isSelected = subPiece.finishingType === type
-                    const label = type === 'none' ? t.noFinish : type === 'lightSanding' ? t.lightSanding : type === 'fullSanding' ? t.fullSanding : type === 'primerPaint' ? t.primerPaint : type === 'fullPaint' ? t.fullPaint : type === 'vaporSmoothing' ? t.vaporSmoothing : type === 'epoxyCoating' ? t.epoxyCoating : t.customFinish
-                    return (
-                      <motion.button
-                        key={type}
-                        onClick={() => {
-                          update({
-                            finishingType: type,
-                            finishingCostPerPiece: type === 'custom' ? subPiece.finishingCostPerPiece : config.costPerPiece,
-                          })
-                        }}
-                        className={`p-2 rounded-lg border text-center transition-all
-                          ${isSelected ? 'border-copper bg-copper/10' : 'border-border bg-card hover:border-copper/40'}
-                        `}
-                        whileTap={{ scale: 0.97 }}
-                      >
-                        <span className="text-[10px] font-semibold block truncate">{label}</span>
-                        <span className="text-[9px] text-muted-foreground">
-                          {config.costPerPiece === 0 ? t.free : `${config.costPerPiece}${t.perPiece}`}
-                        </span>
-                      </motion.button>
-                    )
-                  })}
-                </div>
-                {subPiece.finishingType === 'custom' && (
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="number"
-                      value={subPiece.finishingCostPerPiece}
-                      onChange={(e) => update({ finishingCostPerPiece: Math.max(0, parseFloat(e.target.value) || 0) })}
-                      min={0} step={0.5}
-                      placeholder={t.costPerKg}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper font-mono"
-                    />
-                    <input
-                      type="text"
-                      value={subPiece.customFinishingDescription}
-                      onChange={(e) => update({ customFinishingDescription: e.target.value })}
-                      placeholder={t.customFinishDesc}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-copper"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  )
-}
-
-// ─── Breakdown Bar ───
 function BreakdownBar({ result, currency }: { result: ProjectPricingResult; currency: CurrencyCode }) {
-  const total = result.totalProjectPrice
-  if (total <= 0) return null
-
-  const otherCosts = result.totalBaseCost - result.totalMaterialCost
+  const total = result.totalProjectPrice || 1
   const segments = [
-    { value: result.totalMaterialCost, color: '#6B9E72' },
-    { value: otherCosts > 0 ? otherCosts : 0, color: '#4FC3F7' },
-    { value: result.totalProfit, color: '#C77D3A' },
-    { value: result.totalTax, color: '#D4A843' },
-    { value: result.totalPackaging + result.totalShipping, color: '#8A8690' },
-  ].filter(s => s.value > 0)
+    { pct: (result.totalMaterialCost / total) * 100, color: '#6B9E72', label: 'Material' },
+    { pct: ((result.totalBaseCost - result.totalMaterialCost) / total) * 100, color: '#4FC3F7', label: 'Operation' },
+    { pct: (result.totalProfit / total) * 100, color: '#C77D3A', label: 'Profit' },
+    { pct: (result.totalTax / total) * 100, color: '#D4A843', label: 'Tax' },
+    { pct: ((result.totalPackaging + result.totalShipping) / total) * 100, color: '#8A8690', label: 'Ship+Pkg' },
+  ].filter(s => s.pct > 0.5)
 
   return (
     <div className="breakdown-bar">
-      {segments.map((seg, i) => {
-        const pct = (seg.value / total) * 100
-        return (
-          <motion.div
-            key={i}
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            style={{ backgroundColor: seg.color, color: pct > 12 ? '#fff' : 'transparent' }}
-          >
-            {pct > 12 ? `${pct.toFixed(0)}%` : ''}
-          </motion.div>
-        )
-      })}
+      {segments.map((seg, i) => (
+        <div key={i} style={{ width: `${seg.pct}%`, backgroundColor: seg.color }} title={`${seg.label}: ${seg.pct.toFixed(1)}%`} />
+      ))}
     </div>
   )
 }
 
 function LegendItem({ color, label, value, currency }: { color: string; label: string; value: number; currency: CurrencyCode }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
-      <div className="flex flex-col leading-tight min-w-0">
-        <span className="text-[9px] text-muted-foreground truncate">{label}</span>
-        <span className="font-mono font-semibold text-foreground text-[10px]">{formatCurrency(value, currency)}</span>
-      </div>
+    <div className="flex items-center gap-1.5">
+      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-[10px] font-mono font-bold text-foreground ml-auto">{formatCurrency(value, currency)}</span>
     </div>
   )
 }
 
 function BreakdownSummaryItem({ label, value, currency, highlight }: { label: string; value: number; currency: CurrencyCode; highlight?: boolean }) {
   return (
-    <div className={`flex flex-col p-2 rounded-lg ${highlight ? 'bg-copper/10 border border-copper/20' : 'bg-secondary/20'}`}>
-      <span className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">{label}</span>
-      <span className={`font-mono font-bold text-xs ${highlight ? 'text-copper text-sm' : 'text-foreground'}`}>
-        {formatCurrency(value, currency)}
-      </span>
+    <div className={`p-2.5 rounded-lg ${highlight ? 'bg-copper/10 border border-copper/20' : 'bg-secondary/30'}`}>
+      <div className="text-[10px] text-muted-foreground mb-0.5">{label}</div>
+      <div className={`font-display font-bold text-sm ${highlight ? 'text-copper' : 'text-foreground'}`}>{formatCurrency(value, currency)}</div>
     </div>
   )
 }
 
-// ─── Sub-piece breakdown (detailed) ───
-function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCostBreakdown; currency: CurrencyCode; t: Record<string, string> }) {
-  const [isOpen, setIsOpen] = useState(false)
-
+function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCostBreakdown; currency: CurrencyCode; t: any }) {
+  const [open, setOpen] = useState(false)
   const rows = [
     { label: t.materialWithWaste, value: breakdown.materialCost },
     { label: t.printerDepreciation, value: breakdown.printerDepreciation },
     { label: t.electricity, value: breakdown.electricityCost },
     { label: t.maintenanceCost, value: breakdown.maintenanceCost },
-    { label: t.labor, value: breakdown.laborCost },
+    { label: t.labor, value: breakdown.laborCost + breakdown.supervisionCost },
     { label: t.finishing, value: breakdown.finishingCost },
     { label: t.failureRisk, value: breakdown.failureCost },
-    { label: t.subtotal, value: breakdown.subtotalPerUnit, bold: true },
     { label: t.overheadCost, value: breakdown.overheadPerUnit },
-    { label: t.baseCost, value: breakdown.baseCostPerUnit, bold: true },
     { label: t.profitPerUnit, value: breakdown.profitPerUnit },
-    { label: t.priceBeforeTax, value: breakdown.priceBeforeTaxPerUnit },
     { label: t.taxPerUnit, value: breakdown.taxPerUnit },
-    { label: t.totalPerUnit, value: breakdown.totalPerUnit, bold: true, highlight: true },
-    { label: t.totalForQty.replace('{qty}', String(breakdown.quantity)), value: breakdown.totalForQuantity, bold: true, highlight: true },
   ]
 
   return (
-    <div className="rounded-lg border border-border/60 bg-secondary/10 overflow-hidden mb-2">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-2.5 hover:bg-secondary/20 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-          </motion.div>
-          <span className="font-display font-semibold text-xs text-foreground">{breakdown.subPieceName}</span>
-          <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-full">×{breakdown.quantity}</span>
-        </div>
-        <span className="font-mono font-bold text-copper text-xs">
-          {formatCurrency(breakdown.totalForQuantity, currency)}
-        </span>
+    <div className="border border-border/50 rounded-lg mb-2 overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between p-3 hover:bg-secondary/30 transition-colors">
+        <div className="flex items-center gap-2"><span className="font-display font-semibold text-sm">{breakdown.subPieceName}</span><span className="text-[11px] text-muted-foreground">×{breakdown.quantity}</span></div>
+        <div className="flex items-center gap-2"><span className="font-display font-bold text-sm text-copper">{formatCurrency(breakdown.totalForQuantity, currency)}</span><motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}><ChevronDown className="w-3 h-3 text-muted-foreground" /></motion.div></div>
       </button>
-
       <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 pt-1 space-y-0.5 text-xs">
-              {rows.map((row) => (
-                <div
-                  key={row.label}
-                  className={`flex justify-between items-center py-1 px-1 rounded
-                    ${row.highlight ? 'border-t border-border mt-1 pt-2 bg-copper/5' : ''}
-                    ${row.bold && !row.highlight ? 'bg-secondary/30' : ''}
-                  `}
-                >
-                  <span className={`${row.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                    {row.label}
-                  </span>
-                  <span className={`font-mono
-                    ${row.highlight ? 'font-bold text-copper' : row.bold ? 'font-bold text-foreground' : 'text-muted-foreground'}`}
-                  >
-                    {formatCurrency(row.value, currency)}
-                  </span>
-                </div>
+        {open && (
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+            <div className="px-3 pb-3 space-y-1">
+              {rows.map((row, i) => row.value > 0 && (
+                <div key={i} className="flex items-center justify-between text-xs"><span className="text-muted-foreground">{row.label}</span><span className="font-mono text-foreground">{formatCurrency(row.value, currency)}</span></div>
               ))}
             </div>
           </motion.div>
@@ -1362,263 +1266,251 @@ function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCost
   )
 }
 
-// ─── Generate Producer Report HTML ───
-function generateProducerReport(
-  project: Project,
-  selectedResult: ProjectPricingResult,
-  tierNameMap: Record<string, string>,
-  t: Record<string, string>
-) {
-  const now = new Date()
-  const date = now.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
-  const reportId = `RPT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+// ─── Piece Card ───
+function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
+  subPiece: SubPiece; index: number; currency: CurrencyCode; onChange: (sp: SubPiece) => void; onRemove: () => void; t: any
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const update = (partial: Partial<SubPiece>) => onChange({ ...subPiece, ...partial })
 
-  const printer = project.params.printerModel !== 'custom' ? getPrinterById(project.params.printerModel) : null
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card section-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 p-3">
+        <input type="color" value={subPiece.color} onChange={(e) => update({ color: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0" />
+        <input type="text" value={subPiece.name} onChange={(e) => update({ name: e.target.value })} className="font-display font-semibold text-sm text-foreground bg-transparent border-none outline-none flex-1 min-w-0" />
+        <span className="text-[10px] text-muted-foreground font-mono">×{subPiece.quantity}</span>
+        <button onClick={() => setExpanded(!expanded)} className="w-6 h-6 rounded flex items-center justify-center hover:bg-secondary/80"><motion.div animate={{ rotate: expanded ? 0 : 180 }} transition={{ duration: 0.2 }}><ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /></motion.div></button>
+        <button onClick={onRemove} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10"><Trash2 className="w-3.5 h-3.5 text-destructive/60" /></button>
+      </div>
 
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>D-Calc — Producer Report — ${project.name}</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;color:#1a1a2e;padding:32px;line-height:1.6;max-width:750px;margin:0 auto;font-size:13px}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #C77D3A;padding-bottom:16px;margin-bottom:20px}
-    .logo{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#C77D3A}
-    .logo span{color:#6B9E72}
-    .report-type{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
-    .report-id{font-family:'Space Grotesk',monospace;font-size:11px;color:#6B6572;text-align:right}
-    h2{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#C77D3A;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #E8E2DA}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .item{padding:8px 12px;background:#f8f6f3;border-radius:8px}
-    .item-label{font-size:10px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px}
-    .item-value{font-family:'Space Grotesk',monospace;font-weight:600;font-size:14px;color:#1a1a2e}
-    .piece-section{margin:16px 0;padding:12px;border:1px solid #E8E2DA;border-radius:10px}
-    .piece-header{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#1a1a2e;margin-bottom:8px}
-    .cost-row{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;font-size:12px}
-    .cost-row.alt{background:#f8f6f3;border-radius:4px}
-    .cost-row .label{color:#6B6572}
-    .cost-row .value{font-family:'Space Grotesk',monospace;font-weight:600;color:#1a1a2e}
-    .cost-row.bold .label{font-weight:700;color:#1a1a2e}
-    .cost-row.bold .value{font-weight:700;color:#C77D3A}
-    .cost-row.highlight{background:#C77D3A10;border-radius:6px;padding:6px 8px;margin-top:4px}
-    .cost-row.highlight .label{font-weight:700;color:#1a1a2e}
-    .cost-row.highlight .value{font-weight:700;color:#C77D3A;font-size:14px}
-    .total-bar{text-align:center;padding:16px;background:#C77D3A10;border-radius:12px;margin-top:20px}
-    .total-label{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1px}
-    .total-price{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#C77D3A;margin-top:4px}
-    .footer{margin-top:24px;text-align:center;font-size:10px;color:#6B6572;border-top:1px solid #E8E2DA;padding-top:12px}
-    .param-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-    .param-item{padding:6px 10px;background:#f8f6f3;border-radius:6px;font-size:11px}
-    .param-item .pl{font-size:9px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px}
-    .param-item .pv{font-family:'Space Grotesk',monospace;font-weight:600;font-size:12px;color:#1a1a2e}
-    @media print{body{padding:20px}}
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="logo">D-<span>Calc</span></div>
-      <div class="report-type">${t.producerReportTitle}</div>
-    </div>
-    <div>
-      <div class="report-id">${reportId}</div>
-      <div style="font-size:11px;color:#6B6572">${date}</div>
-    </div>
-  </div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
+            <div className="px-3 pb-3 space-y-3">
+              {/* Row 1: Filament */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.filamentType} <InfoTooltip text={t.tooltipFilamentType} /></label>
+                  <select value={subPiece.filamentType} onChange={(e) => {
+                    const type = e.target.value as FilamentType
+                    update({ filamentType: type, filamentCostPerKg: FILAMENT_DEFAULTS[type].costPerKg })
+                  }} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
+                    {Object.keys(FILAMENT_DEFAULTS).map(ft => <option key={ft} value={ft}>{ft}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.weightGrams} <InfoTooltip text={t.tooltipPrintWeight} /></label>
+                  <input type="number" min={0} step={1} value={subPiece.printWeight} onChange={(e) => update({ printWeight: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.costPerKg} <InfoTooltip text={t.tooltipFilamentCost} /></label>
+                  <input type="number" min={0} step={0.5} value={subPiece.filamentCostPerKg} onChange={(e) => update({ filamentCostPerKg: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+              </div>
 
-  <h2>${t.projectSummary}</h2>
-  <div class="grid">
-    <div class="item"><div class="item-label">Project</div><div class="item-value">${project.name}</div></div>
-    <div class="item"><div class="item-label">${t.saleType}</div><div class="item-value">${project.saleType === 'wholesale' ? t.wholesale : project.saleType === 'retail' ? t.retail : project.saleType === 'custom' ? t.customSale : t.rush}</div></div>
-    <div class="item"><div class="item-label">Tier</div><div class="item-value">${tierNameMap[selectedResult.tier]}</div></div>
-    <div class="item"><div class="item-label">Margin</div><div class="item-value">${(selectedResult.profitMargin * 100).toFixed(0)}%</div></div>
-  </div>
+              {/* Row 2: Time + Quantity */}
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.hours} <InfoTooltip text={t.tooltipPrintTime} /></label>
+                  <input type="number" min={0} step={1} value={subPiece.printTimeHours} onChange={(e) => update({ printTimeHours: parseInt(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">{t.minutes}</label>
+                  <input type="number" min={0} max={59} step={5} value={subPiece.printTimeMinutes} onChange={(e) => update({ printTimeMinutes: parseInt(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.quantity} <InfoTooltip text={t.tooltipQuantity} /></label>
+                  <input type="number" min={1} step={1} value={subPiece.quantity} onChange={(e) => update({ quantity: parseInt(e.target.value) || 1 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.waste} <InfoTooltip text={t.tooltipWaste} /></label>
+                  <input type="number" min={0} max={100} step={1} value={subPiece.wastePercentage} onChange={(e) => update({ wastePercentage: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+              </div>
 
-  <h2>${t.printParametersLabel}</h2>
-  <div class="param-grid">
-    <div class="param-item"><div class="pl">Printer</div><div class="pv">${printer ? printer.model : 'Custom'}</div></div>
-    <div class="param-item"><div class="pl">${t.printerCost}</div><div class="pv">${formatCurrency(project.params.printerCost, project.currency)}</div></div>
-    <div class="param-item"><div class="pl">${t.printerLifespan}</div><div class="pv">${project.params.printerLifespanHours}h</div></div>
-    <div class="param-item"><div class="pl">${t.powerConsumption}</div><div class="pv">${project.params.powerConsumptionWatts}W</div></div>
-    <div class="param-item"><div class="pl">${t.electricityCost}</div><div class="pv">${project.params.electricityCostPerKWh}</div></div>
-    <div class="param-item"><div class="pl">${t.laborRate}</div><div class="pv">${formatCurrency(project.params.laborCostPerHour, project.currency)}/h</div></div>
-    <div class="param-item"><div class="pl">${t.maintenance}</div><div class="pv">${formatCurrency(project.params.maintenanceCostPerHour, project.currency)}/h</div></div>
-    <div class="param-item"><div class="pl">${t.failureRate}</div><div class="pv">${project.params.failureRate}%</div></div>
-    <div class="param-item"><div class="pl">${t.overhead}</div><div class="pv">${project.params.overheadPercentage}%</div></div>
-    <div class="param-item"><div class="pl">${t.taxRate}</div><div class="pv">${project.params.taxRate}%</div></div>
-    <div class="param-item"><div class="pl">${t.packaging}</div><div class="pv">${formatCurrency(project.params.packagingCostPerProject, project.currency)}</div></div>
-    <div class="param-item"><div class="pl">${t.shipping}</div><div class="pv">${formatCurrency(project.params.shippingCostPerProject, project.currency)}</div></div>
-  </div>
-
-  <h2>${t.subpieceBreakdown}</h2>
-  ${selectedResult.subPieceBreakdowns.map(b => `
-  <div class="piece-section">
-    <div class="piece-header">${b.subPieceName} ×${b.quantity}</div>
-    <div class="cost-row"><span class="label">${t.materialWithWaste}</span><span class="value">${formatCurrency(b.materialCost, project.currency)}</span></div>
-    <div class="cost-row alt"><span class="label">${t.printerDepreciation}</span><span class="value">${formatCurrency(b.printerDepreciation, project.currency)}</span></div>
-    <div class="cost-row"><span class="label">${t.electricity}</span><span class="value">${formatCurrency(b.electricityCost, project.currency)}</span></div>
-    <div class="cost-row alt"><span class="label">${t.maintenanceCost}</span><span class="value">${formatCurrency(b.maintenanceCost, project.currency)}</span></div>
-    <div class="cost-row"><span class="label">${t.labor}</span><span class="value">${formatCurrency(b.laborCost, project.currency)}</span></div>
-    <div class="cost-row alt"><span class="label">${t.finishing}</span><span class="value">${formatCurrency(b.finishingCost, project.currency)}</span></div>
-    <div class="cost-row"><span class="label">${t.failureRisk}</span><span class="value">${formatCurrency(b.failureCost, project.currency)}</span></div>
-    <div class="cost-row bold"><span class="label">${t.subtotal}</span><span class="value">${formatCurrency(b.subtotalPerUnit, project.currency)}</span></div>
-    <div class="cost-row"><span class="label">${t.overheadCost}</span><span class="value">${formatCurrency(b.overheadPerUnit, project.currency)}</span></div>
-    <div class="cost-row bold"><span class="label">${t.baseCost}</span><span class="value">${formatCurrency(b.baseCostPerUnit, project.currency)}</span></div>
-    <div class="cost-row"><span class="label">${t.profitPerUnit}</span><span class="value">${formatCurrency(b.profitPerUnit, project.currency)}</span></div>
-    <div class="cost-row bold"><span class="label">${t.totalPerUnit}</span><span class="value">${formatCurrency(b.totalPerUnit, project.currency)}</span></div>
-    <div class="cost-row highlight"><span class="label">${t.totalForQty.replace('{qty}', String(b.quantity))}</span><span class="value">${formatCurrency(b.totalForQuantity, project.currency)}</span></div>
-  </div>`).join('')}
-
-  <h2>${t.projectTotal}</h2>
-  <div class="grid">
-    <div class="item"><div class="item-label">${t.totalMaterial}</div><div class="item-value">${formatCurrency(selectedResult.totalMaterialCost, project.currency)}</div></div>
-    <div class="item"><div class="item-label">${t.totalBase}</div><div class="item-value">${formatCurrency(selectedResult.totalBaseCost, project.currency)}</div></div>
-    <div class="item"><div class="item-label">${t.totalProfitLabel}</div><div class="item-value">${formatCurrency(selectedResult.totalProfit, project.currency)}</div></div>
-    <div class="item"><div class="item-label">${t.priceBeforeTax}</div><div class="item-value">${formatCurrency(selectedResult.totalPriceBeforeTax, project.currency)}</div></div>
-    <div class="item"><div class="item-label">${t.taxIncluded}</div><div class="item-value">${formatCurrency(selectedResult.totalTax, project.currency)}</div></div>
-    ${(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) ? `
-    <div class="item"><div class="item-label">${t.packagingAndShipping}</div><div class="item-value">${formatCurrency(selectedResult.totalPackaging + selectedResult.totalShipping, project.currency)}</div></div>` : ''}
-  </div>
-  <div class="total-bar">
-    <div class="total-label">${t.projectTotal}</div>
-    <div class="total-price">${formatCurrency(selectedResult.totalProjectPrice, project.currency)}</div>
-  </div>
-
-  <div class="footer">${t.generatedBy} · ${date}</div>
-</body>
-</html>`
+              {/* Row 3: Finishing + Processing */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.finishType} <InfoTooltip text={t.tooltipFinishingType} /></label>
+                  <select value={subPiece.finishingType} onChange={(e) => {
+                    const ft = e.target.value as FinishingType
+                    update({ finishingType: ft, finishingCostPerPiece: FINISHING_DEFAULTS[ft].costPerPiece })
+                  }} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
+                    {Object.entries(FINISHING_DEFAULTS).map(([key, val]) => <option key={key} value={key}>{key === 'none' ? t.noFinish : key === 'lightSanding' ? t.lightSanding : key === 'fullSanding' ? t.fullSanding : key === 'primerPaint' ? t.primerPaint : key === 'fullPaint' ? t.fullPaint : key === 'vaporSmoothing' ? t.vaporSmoothing : key === 'epoxyCoating' ? t.epoxyCoating : t.customFinish}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.postProcessing} <InfoTooltip text={t.tooltipPostProcessing} /></label>
+                  <input type="number" min={0} step={5} value={subPiece.postProcessingTimeMinutes} onChange={(e) => update({ postProcessingTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.laborTime} <InfoTooltip text={t.tooltipLaborTime} /></label>
+                  <input type="number" min={0} step={5} value={subPiece.laborTimeMinutes} onChange={(e) => update({ laborTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
 }
 
-// ─── Generate Invoice HTML ───
-function generateInvoice(
-  project: Project,
-  selectedResult: ProjectPricingResult,
-  t: Record<string, string>
-) {
-  const now = new Date()
-  const date = now.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
-  const invoiceNumber = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-  const subtotal = selectedResult.totalPriceBeforeTax
-  const tax = selectedResult.totalTax
-  const packagingShipping = selectedResult.totalPackaging + selectedResult.totalShipping
-  const total = selectedResult.totalProjectPrice
+// ─── Printer Profile Modal ───
+function PrinterProfileModal({ profile, onClose, onSave, onDelete, t }: {
+  profile: PrinterProfile | null; onClose: () => void; onSave: (p: PrinterProfile) => void; onDelete: (id: string) => void; t: any
+}) {
+  const [form, setForm] = useState<PrinterProfile>(profile || { id: '', name: '', model: '', price: 300, expectedLifespanYears: 2.5, powerConsumptionWatts: 200, failureRate: 5, maintenanceCostPerHour: 0.10, isDefault: false })
+  const updateForm = (partial: Partial<PrinterProfile>) => setForm(prev => ({ ...prev, ...partial }))
 
-  const isEs = t.appSubtitle.includes('impresión') || t.appSubtitle.includes('inprimaketa')
-  const invoiceTitle = isEs ? 'Factura' : 'Invoice'
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed inset-x-4 top-[10%] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[70] glass-card-premium p-6 max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display font-bold text-lg">{profile ? (t.editProfile || 'Edit Profile') : (t.createProfile || 'New Profile')}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary/80 flex items-center justify-center"><X className="w-4 h-4" /></button>
+        </div>
 
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>D-Calc — ${invoiceTitle} — ${project.name}</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'DM Sans',system-ui,sans-serif;background:#fff;color:#1a1a2e;padding:40px;line-height:1.6;max-width:600px;margin:0 auto}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #C77D3A;padding-bottom:20px;margin-bottom:25px}
-    .logo{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#C77D3A}
-    .logo span{color:#6B9E72}
-    .invoice-label{font-size:11px;color:#6B6572;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}
-    .invoice-meta{text-align:right;font-size:12px;color:#6B6572}
-    .invoice-meta .inv-num{font-family:'Space Grotesk',monospace;font-weight:700;font-size:14px;color:#1a1a2e}
-    .project-name{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1a1a2e;margin:20px 0 5px}
-    .date-line{font-size:12px;color:#6B6572}
-    table{width:100%;border-collapse:collapse;margin:20px 0}
-    th{text-align:left;font-size:10px;color:#6B6572;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px;border-bottom:2px solid #E8E2DA}
-    th:last-child{text-align:right}
-    td{padding:10px 12px;border-bottom:1px solid #E8E2DA;font-size:13px}
-    td:last-child{text-align:right;font-family:'Space Grotesk',monospace;font-weight:600}
-    .item-name{font-weight:600}
-    .item-detail{font-size:11px;color:#6B6572}
-    .summary-section{margin-top:15px}
-    .summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;font-size:13px}
-    .summary-row.alt{background:#f8f6f3}
-    .summary-row .label{color:#6B6572}
-    .summary-row .value{font-family:'Space Grotesk',monospace;font-weight:600;color:#1a1a2e}
-    .summary-row.total{background:#C77D3A10;border-radius:10px;padding:12px 16px;margin-top:8px}
-    .summary-row.total .label{font-weight:700;color:#1a1a2e;text-transform:uppercase;letter-spacing:0.5px;font-size:11px}
-    .summary-row.total .value{font-weight:700;color:#C77D3A;font-size:20px}
-    .footer{margin-top:30px;text-align:center;font-size:11px;color:#6B6572;border-top:1px solid #E8E2DA;padding-top:15px}
-    @media print{body{padding:20px}}
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="logo">D-<span>Calc</span></div>
-      <div class="invoice-label">${invoiceTitle}</div>
-    </div>
-    <div class="invoice-meta">
-      <div class="inv-num">${invoiceNumber}</div>
-      <div>${date}</div>
-    </div>
-  </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileName || 'Profile Name'}</label>
+              <input type="text" value={form.name} onChange={e => updateForm({ name: e.target.value })} placeholder="My Bambu P1S" className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileModel || 'Model'}</label>
+              <input type="text" value={form.model} onChange={e => updateForm({ model: e.target.value })} placeholder="Bambu Lab P1S" className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profilePrice || 'Price (€)'}</label>
+              <input type="number" min={0} step={10} value={form.price} onChange={e => updateForm({ price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileLifespanYears || 'Lifespan (years)'}</label>
+              <input type="number" min={0.5} step={0.5} value={form.expectedLifespanYears} onChange={e => updateForm({ expectedLifespanYears: parseFloat(e.target.value) || 1 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profilePower || 'Power (W)'}</label>
+              <input type="number" min={0} step={10} value={form.powerConsumptionWatts} onChange={e => updateForm({ powerConsumptionWatts: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileFailureRate || 'Failure %'}</label>
+              <input type="number" min={0} max={100} step={0.5} value={form.failureRate} onChange={e => updateForm({ failureRate: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileMaintenance || 'Maint. (€/h)'}</label>
+              <input type="number" min={0} step={0.01} value={form.maintenanceCostPerHour} onChange={e => updateForm({ maintenanceCostPerHour: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" />
+            </div>
+          </div>
 
-  <div class="project-name">${project.name}</div>
-  <div class="date-line">${t.validFor30} ${date}</div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="profileDefault" checked={form.isDefault} onChange={e => updateForm({ isDefault: e.target.checked })} className="rounded" />
+            <label htmlFor="profileDefault" className="text-xs text-muted-foreground">{t.profileDefault || 'Set as default'}</label>
+          </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>${t.projectPieces}</th>
-        <th>${t.quantity}</th>
-        <th>${t.unitPrice}</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${selectedResult.subPieceBreakdowns.map(b => `
-      <tr>
-        <td><div class="item-name">${b.subPieceName}</div><div class="item-detail">${b.subPieceName}</div></td>
-        <td>${b.quantity}</td>
-        <td>${formatCurrency(b.totalPerUnit, project.currency)}</td>
-        <td>${formatCurrency(b.totalForQuantity, project.currency)}</td>
-      </tr>`).join('')}
-      ${(packagingShipping > 0) ? `
-      <tr>
-        <td><div class="item-name">${t.packagingAndShipping}</div></td>
-        <td>1</td>
-        <td>${formatCurrency(packagingShipping, project.currency)}</td>
-        <td>${formatCurrency(packagingShipping, project.currency)}</td>
-      </tr>` : ''}
-    </tbody>
-  </table>
-
-  <div class="summary-section">
-    <div class="summary-row alt"><span class="label">Subtotal</span><span class="value">${formatCurrency(subtotal, project.currency)}</span></div>
-    <div class="summary-row"><span class="label">${t.taxIncluded} (${project.params.taxRate}%)</span><span class="value">${formatCurrency(tax, project.currency)}</span></div>
-    ${packagingShipping > 0 ? `<div class="summary-row alt"><span class="label">${t.packagingAndShipping}</span><span class="value">${formatCurrency(packagingShipping, project.currency)}</span></div>` : ''}
-    <div class="summary-row total">
-      <span class="label">Total</span>
-      <span class="value">${formatCurrency(total, project.currency)}</span>
-    </div>
-  </div>
-
-  <div class="footer">${t.generatedBy} · ${t.validFor30} ${date}</div>
-</body>
-</html>`
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => onSave(form)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-display font-bold text-sm">{t.saveProject || 'Save'}</button>
+            {profile && profile.id !== 'custom' && (
+              <button onClick={() => onDelete(profile.id)} className="px-4 py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm hover:bg-destructive/10">{t.deleteProfile || 'Delete'}</button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </>
+  )
 }
 
-// ─── Print / Download helpers ───
-function printHtml(html: string, title: string) {
-  const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
-  iframe.title = title
-  document.body.appendChild(iframe)
-  const doc = iframe.contentWindow?.document
-  if (!doc) { document.body.removeChild(iframe); downloadHtml(html, title); return }
-  doc.open(); doc.write(html); doc.close()
-  setTimeout(() => {
-    try { iframe.contentWindow?.focus(); iframe.contentWindow?.print() }
-    catch { downloadHtml(html, title) }
-    setTimeout(() => { try { document.body.removeChild(iframe) } catch {} }, 1000)
-  }, 400)
+// ─── Stat Card ───
+function StatCard({ icon, label, value, bgClass, iconColor }: { icon: React.ReactNode; label: string; value: string; bgClass: string; iconColor: string }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card section-card p-5">
+      <div className="flex items-center gap-3 mb-3"><div className={`w-9 h-9 rounded-lg ${bgClass} flex items-center justify-center ${iconColor}`}>{icon}</div><span className="text-xs text-muted-foreground uppercase tracking-wide font-display">{label}</span></div>
+      <div className="font-display font-extrabold text-2xl text-foreground">{value}</div>
+    </motion.div>
+  )
 }
 
-function downloadHtml(html: string, title: string) {
-  const blob = new Blob([html], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = `${title}.html`; a.click()
-  URL.revokeObjectURL(url)
+// ─── Report Generator ───
+function generateReport(project: Project, result: ProjectPricingResult, t: any, type: 'producer' | 'invoice') {
+  const isInvoice = type === 'invoice'
+  const title = isInvoice ? t.buyerTicketTitle : t.producerReportTitle
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>
+    body{font-family:system-ui,sans-serif;max-width:800px;margin:0 auto;padding:40px 20px;color:#1a1a1a}
+    h1{color:#C77D3A;font-size:24px;margin-bottom:4px}h2{color:#C77D3A;font-size:16px;margin:20px 0 10px;border-bottom:2px solid #C77D3A;padding-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin:10px 0}th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e5e5e5;font-size:13px}
+    th{background:#f8f6f3;font-weight:600;color:#666}.total-row{font-weight:bold;background:#f8f6f3}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px}
+    .badge{display:inline-block;background:#C77D3A;color:white;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600}
+    .footer{margin-top:40px;padding-top:20px;border-top:1px solid #e5e5e5;font-size:11px;color:#999}
+  </style></head><body>
+    <div class="header"><div><h1>D-Calc</h1><p style="color:#666;font-size:12px;margin:0">${t.appSubtitle}</p></div><div class="badge">${isInvoice ? t.buyerTicket : t.producerReport}</div></div>
+    <h1>${title}</h1>
+    <p><strong>${t.projectPieces}:</strong> ${project.name} &nbsp;|&nbsp; <strong>${t.saleType}:</strong> ${project.saleType} &nbsp;|&nbsp; <strong>${t.margin}:</strong> ${(result.profitMargin * 100).toFixed(0)}%</p>
+    ${isInvoice ? '' : `<h2>${t.printParametersLabel}</h2><table><tr><th>${t.printerCost}</th><th>${t.printerLifespan}</th><th>${t.powerConsumption}</th><th>${t.electricityCost}</th></tr>
+    <tr><td>${formatCurrency(project.params.printerCost, project.currency)}</td><td>${project.params.printerLifespanHours}h</td><td>${project.params.powerConsumptionWatts}W</td><td>${project.params.electricityCostPerKWh}€/kWh</td></tr></table>`}
+    <h2>${t.subpieceBreakdown}</h2>
+    <table><tr><th>Pieza</th><th>Cant.</th>${isInvoice ? '' : `<th>${t.material}</th><th>${t.electricity}</th><th>${t.labor}</th>`}<th>${t.totalPerUnit}</th><th>Total</th></tr>
+    ${result.subPieceBreakdowns.map(bd => `<tr><td>${bd.subPieceName}</td><td>${bd.quantity}</td>${isInvoice ? '' : `<td>${formatCurrency(bd.materialCost, project.currency)}</td><td>${formatCurrency(bd.electricityCost, project.currency)}</td><td>${formatCurrency(bd.laborCost + bd.supervisionCost, project.currency)}</td>`}<td>${formatCurrency(bd.totalPerUnit, project.currency)}</td><td>${formatCurrency(bd.totalForQuantity, project.currency)}</td></tr>`).join('')}
+    </table>
+    <h2>${t.projectSummary}</h2>
+    <table>
+    <tr><td>${t.totalBase}</td><td>${formatCurrency(result.totalBaseCost, project.currency)}</td></tr>
+    <tr><td>${t.totalProfitLabel}</td><td>${formatCurrency(result.totalProfit, project.currency)}</td></tr>
+    <tr><td>${t.priceBeforeTax}</td><td>${formatCurrency(result.totalPriceBeforeTax, project.currency)}</td></tr>
+    <tr><td>${t.taxIncluded} (${project.params.taxRate}%)</td><td>${formatCurrency(result.totalTax, project.currency)}</td></tr>
+    ${result.totalPackaging > 0 ? `<tr><td>${t.packaging}</td><td>${formatCurrency(result.totalPackaging, project.currency)}</td></tr>` : ''}
+    ${result.totalShipping > 0 ? `<tr><td>${t.shipping}</td><td>${formatCurrency(result.totalShipping, project.currency)}</td></tr>` : ''}
+    <tr class="total-row"><td>${t.projectTotal}</td><td>${formatCurrency(result.totalProjectPrice, project.currency)}</td></tr>
+    </table>
+    <div class="footer"><p>${t.generatedBy} · ${new Date().toLocaleDateString()} · ${t.validFor30} ${new Date().toLocaleDateString()}</p></div>
+  </body></html>`
+
+  const w = window.open('', '_blank')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
+// ─── Footer ───
+function Footer() {
+  return (
+    <footer className="mt-auto border-t border-border/30 py-4 px-4">
+      <div className="max-w-[1400px] mx-auto flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>D-<span className="text-gradient-copper">Calc</span> — Professional FDM 3D Printing Calculator</span>
+        <span>© {new Date().getFullYear()}</span>
+      </div>
+    </footer>
+  )
+}
+
+// ═══════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════
+export default function Home() {
+  const [currentPage, setCurrentPage] = useState<AppPage>('calculator')
+
+  return (
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* Ambient glows */}
+      <div className="ambient-glow-1" />
+      <div className="ambient-glow-2" />
+
+      <NavBar currentPage={currentPage} onNavigate={setCurrentPage} />
+
+      <AnimatePresence mode="wait">
+        <motion.div key={currentPage} variants={pageVariants} initial="enter" animate="center" exit="exit" transition={pageTransition} className="flex flex-col flex-1">
+          {currentPage === 'home' && <HomePage onNavigate={setCurrentPage} />}
+          {currentPage === 'calculator' && <CalculatorPage />}
+          {currentPage === 'auth' && <AuthPage onNavigate={setCurrentPage} />}
+          {currentPage === 'dashboard' && <DashboardPage onNavigate={setCurrentPage} />}
+        </motion.div>
+      </AnimatePresence>
+
+      <Footer />
+    </div>
+  )
 }

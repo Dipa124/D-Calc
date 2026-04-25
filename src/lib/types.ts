@@ -1,4 +1,4 @@
-// D-Calc — Types (v5)
+// D-Calc — Types (v6 — Complete Redesign)
 
 import type { CurrencyCode } from './currency'
 import type { Locale } from './i18n'
@@ -10,6 +10,22 @@ export type FilamentType =
 export type SaleType = 'wholesale' | 'retail' | 'custom' | 'rush';
 export type PricingTier = 'competitive' | 'standard' | 'premium' | 'luxury';
 export type FinishingType = 'none' | 'lightSanding' | 'fullSanding' | 'primerPaint' | 'fullPaint' | 'vaporSmoothing' | 'epoxyCoating' | 'custom';
+
+// ─── App Page ───
+export type AppPage = 'home' | 'calculator' | 'auth' | 'dashboard';
+
+// ─── Printer Profile (user-created) ───
+export interface PrinterProfile {
+  id: string;
+  name: string;                  // e.g. "My Bambu P1S"
+  model: string;                 // e.g. "Bambu Lab P1S"
+  price: number;                 // Purchase price in local currency
+  expectedLifespanYears: number; // Years before replacement (converted to hours internally)
+  powerConsumptionWatts: number; // Average power consumption during printing
+  failureRate: number;           // Default failure rate percentage
+  maintenanceCostPerHour: number; // Maintenance cost per hour
+  isDefault?: boolean;           // If this is the user's default profile
+}
 
 // ─── Sub-piece ───
 export interface SubPiece {
@@ -28,20 +44,19 @@ export interface SubPiece {
   finishingCostPerPiece: number;
   customFinishingDescription: string;
   postProcessingTimeMinutes: number;
-  laborTimeMinutes: number; // Dedicated labor/assembly time (separate from post-processing and supervision)
+  laborTimeMinutes: number;       // Dedicated labor/assembly time (separate from post-processing and supervision)
 }
 
 // ─── Project shared params ───
 export interface ProjectParams {
-  printerModel: string;       // Printer DB id or 'custom'
+  printerProfileId: string;       // Printer profile ID or 'custom'
   printerCost: number;
   printerLifespanHours: number;
   maintenanceCostPerHour: number;
   powerConsumptionWatts: number;
   electricityCostPerKWh: number;
-  laborCostPerHour: number;           // Rate for post-processing + direct manual work
-  supervisionCostPerHour: number;     // Rate for passive print supervision (15% of print time)
-  additionalLaborCostPerHour: number; // Rate for additional labor (applied to laborTimeMinutes)
+  laborCostPerHour: number;       // Rate for post-processing + direct manual work
+  supervisionCostPerHour: number; // Rate for passive print supervision (low — ~5% of print time)
   failureRate: number;
   overheadPercentage: number;
   taxRate: number;
@@ -73,9 +88,8 @@ export interface SubPieceCostBreakdown {
   printerDepreciation: number;
   electricityCost: number;
   maintenanceCost: number;
-  supervisionCost: number;      // Passive supervision cost
-  laborCost: number;            // Post-processing + direct labor
-  additionalLaborCost: number;  // Additional labor (assembly, etc.)
+  supervisionCost: number;
+  laborCost: number;
   finishingCost: number;
   failureCost: number;
   subtotalPerUnit: number;
@@ -138,7 +152,7 @@ export const PRICING_TIER_CONFIG: Record<PricingTier, { label: string; descripti
   luxury: { label: 'luxury', description: 'Exclusive service', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
 };
 
-// ─── Finishing defaults (custom has no suggested price) ───
+// ─── Finishing defaults ───
 export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; subtitle: string }> = {
   none: { costPerPiece: 0, subtitle: 'Free' },
   lightSanding: { costPerPiece: 2, subtitle: '~2€/pc' },
@@ -153,6 +167,7 @@ export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; s
 let _idCounter = 0;
 export function generateId(): string { return `sp_${Date.now()}_${++_idCounter}`; }
 export function generateProjectId(): string { return `proj_${Date.now()}_${++_idCounter}`; }
+export function generateProfileId(): string { return `prf_${Date.now()}_${++_idCounter}`; }
 
 export function getDefaultSubPiece(): SubPiece {
   return {
@@ -168,12 +183,11 @@ export function getDefaultSubPiece(): SubPiece {
 
 export function getDefaultProjectParams(): ProjectParams {
   return {
-    printerModel: 'custom',
+    printerProfileId: 'custom',
     printerCost: 300, printerLifespanHours: 5000, maintenanceCostPerHour: 0.10,
     powerConsumptionWatts: 200, electricityCostPerKWh: 0.15,
     laborCostPerHour: 15,
-    supervisionCostPerHour: 12,
-    additionalLaborCostPerHour: 18,
+    supervisionCostPerHour: 5, // Lowered from 12
     failureRate: 5, overheadPercentage: 10, taxRate: 21,
     packagingCostPerProject: 0.50, shippingCostPerProject: 0,
     designTimeMinutes: 0, designHourlyRate: 25,
@@ -186,5 +200,34 @@ export function getDefaultProject(): Project {
     customMultiplier: 1.4, selectedTier: 'standard',
     subPieces: [getDefaultSubPiece()], params: getDefaultProjectParams(),
     currency: 'EUR', locale: 'es',
+  };
+}
+
+// ─── Helper: Convert printer profile to project params ───
+export function printerProfileToParams(profile: PrinterProfile): Partial<ProjectParams> {
+  // Estimate hours from years: 8h/day * 250 working days = 2000h/year
+  const estimatedHours = profile.expectedLifespanYears * 2000;
+  return {
+    printerProfileId: profile.id,
+    printerCost: profile.price,
+    printerLifespanHours: estimatedHours,
+    maintenanceCostPerHour: profile.maintenanceCostPerHour,
+    powerConsumptionWatts: profile.powerConsumptionWatts,
+    failureRate: profile.failureRate,
+  };
+}
+
+// ─── Default generic printer profile ───
+export function getDefaultPrinterProfile(): PrinterProfile {
+  return {
+    id: 'custom',
+    name: 'Generic FDM',
+    model: 'Generic',
+    price: 300,
+    expectedLifespanYears: 2.5,
+    powerConsumptionWatts: 200,
+    failureRate: 5,
+    maintenanceCostPerHour: 0.10,
+    isDefault: true,
   };
 }

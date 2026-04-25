@@ -1,4 +1,4 @@
-// D-Calc — Core FDM 3D Printing Price Calculation Engine (v5)
+// D-Calc — Core FDM 3D Printing Price Calculation Engine (v6)
 
 import type {
   SubPiece,
@@ -60,21 +60,18 @@ export function calculateSubPiecePrice(
   // Maintenance cost per hour × print time
   const maintenanceCost = params.maintenanceCostPerHour * totalPrintTimeHours;
 
-  // Supervision cost: passive monitoring at supervision rate × 15% of print time
-  const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.15;
+  // Supervision cost: passive monitoring at supervision rate × 5% of print time
+  const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.05;
 
   // Labor cost: post-processing + direct manual work at labor rate
   const laborCost = params.laborCostPerHour * (postProcessingTimeHours + laborTimeHours);
-
-  // Additional labor cost: assembly, preparation, etc. at additional labor rate
-  const additionalLaborCost = params.additionalLaborCostPerHour * laborTimeHours;
 
   // Finishing cost (per piece, already includes quantity)
   const finishingCost = subPiece.finishingCostPerPiece * subPiece.quantity;
 
   // Failure cost: risk premium on core costs
   const failureCost =
-    (materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + laborCost + additionalLaborCost) *
+    (materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + laborCost) *
     (params.failureRate / 100);
 
   // Per-unit subtotal
@@ -85,7 +82,6 @@ export function calculateSubPiecePrice(
     maintenanceCost +
     supervisionCost +
     laborCost +
-    additionalLaborCost +
     subPiece.finishingCostPerPiece +
     failureCost;
 
@@ -123,7 +119,6 @@ export function calculateSubPiecePrice(
     maintenanceCost,
     supervisionCost,
     laborCost,
-    additionalLaborCost,
     finishingCost,
     failureCost,
     subtotalPerUnit,

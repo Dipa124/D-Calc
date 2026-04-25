@@ -11,14 +11,15 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String   // Hashed with bcrypt
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  projects  Project[]
-  sales     Sale[]
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  password        String           // Hashed with bcrypt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  projects        Project[]
+  sales           Sale[]
+  printerProfiles PrinterProfile[]
 }
 
 model Project {
@@ -52,4 +53,22 @@ model Sale {
   @@index([userId])
   @@index([projectId])
   @@index([soldAt])
+}
+
+model PrinterProfile {
+  id                        String   @id @default(cuid())
+  userId                    String
+  name                      String   // e.g. "My Bambu P1S"
+  model                     String   // e.g. "Bambu Lab P1S"
+  price                     Float    // Purchase price
+  expectedLifespanYears     Float    // Years before replacement
+  powerConsumptionWatts     Float    // Average power consumption
+  failureRate               Float    // Failure rate percentage
+  maintenanceCostPerHour    Float    // Maintenance cost per hour
+  isDefault                 Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -8,7 +8,7 @@ import {
 
 const STORAGE_KEY = 'dcalc_project';
 const VERSION_KEY = 'dcalc_version';
-const CURRENT_VERSION = '5';
+const CURRENT_VERSION = '7';
 const DEBOUNCE_MS = 500;
 
 function readFromStorage(): Project | null {
