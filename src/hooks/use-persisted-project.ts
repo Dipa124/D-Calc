@@ -6,9 +6,9 @@ import {
   getDefaultProject,
 } from '@/lib/types';
 
-const STORAGE_KEY = 'calcfdm_project';
-const VERSION_KEY = 'calcfdm_version';
-const CURRENT_VERSION = '3';
+const STORAGE_KEY = 'dcalc_project';
+const VERSION_KEY = 'dcalc_version';
+const CURRENT_VERSION = '5';
 const DEBOUNCE_MS = 500;
 
 function readFromStorage(): Project | null {

@@ -18,27 +18,66 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "CalcFDM — Calculadora de impresión 3D",
+  title: "D-Calc — Free 3D Printing Price Calculator | FDM Cost Estimator",
   description:
-    "Calculadora profesional de costos para impresión 3D FDM. Estima precios de filament, tiempo, energía y mano de obra con precisión industrial.",
+    "Free professional FDM 3D printing price calculator. Estimate filament, time, energy and labor costs with industrial precision. No account required. Track projects, sales and statistics.",
   keywords: [
-    "impresión 3D",
-    "FDM",
-    "calculadora",
-    "costos",
-    "filamento",
-    "3D printing",
-    "price calculator",
+    "3D printing calculator",
+    "FDM price calculator",
+    "3D printing cost",
+    "filament cost estimator",
+    "3D print price",
+    "FDM calculator",
+    "3D printing business",
+    "print cost calculator",
+    "3D printer price estimator",
+    "free 3D printing calculator",
+    "no registration calculator",
+    "3D printing cost estimator",
+    "impresión 3D calculadora",
+    "calculadora impresión 3D",
+    "3D Druck Preisrechner",
+    "calculateur impression 3D",
+    "3D打印价格计算器",
+    "3D inprimaketa kalkulagailua",
+    "D-Calc",
+    "piece manager 3D",
+    "3D printing business tool",
   ],
-  authors: [{ name: "CalcFDM" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  authors: [{ name: "D-Calc" }],
+  creator: "D-Calc",
+  publisher: "D-Calc",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   openGraph: {
-    title: "CalcFDM — Calculadora de impresión 3D",
+    title: "D-Calc — Free 3D Printing Price Calculator",
     description:
-      "Calculadora profesional de costos para impresión 3D FDM",
+      "Professional FDM 3D printing cost calculator. Free, no account needed. Estimate prices, track projects and sales.",
     type: "website",
+    locale: "en_US",
+    alternateLocale: ["es_ES", "zh_CN", "eu_ES"],
+    siteName: "D-Calc",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "D-Calc — Free 3D Printing Price Calculator",
+    description:
+      "Professional FDM 3D printing cost calculator. Free, no account needed.",
+  },
+  alternates: {
+    canonical: "/",
+  },
+  icons: {
+    icon: "/logo.svg",
   },
 };
 
@@ -49,6 +88,35 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: "D-Calc",
+              description: "Free professional FDM 3D printing price calculator",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "EUR",
+              },
+              featureList: [
+                "FDM 3D printing cost calculation",
+                "Multiple pricing tiers",
+                "Project management",
+                "Sales tracking",
+                "Export reports",
+                "Multi-currency support",
+                "No account required",
+              ],
+            }),
+          }}
+        />
+      </head>
       <body
         className={`${spaceGrotesk.variable} ${dmSans.variable} font-sans antialiased bg-background text-foreground`}
       >
@@ -63,7 +131,6 @@ export default function RootLayout({
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
-        {/* Subtle industrial noise texture overlay */}
         <div className="noise-overlay" aria-hidden="true" />
       </body>
     </html>

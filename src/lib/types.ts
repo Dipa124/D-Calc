@@ -1,4 +1,7 @@
-// CalcFDM — Types (v4)
+// D-Calc — Types (v5)
+
+import type { CurrencyCode } from './currency'
+import type { Locale } from './i18n'
 
 export type FilamentType =
   | 'PLA' | 'PLA+' | 'ABS' | 'PETG' | 'TPU' | 'Nylon'
@@ -25,17 +28,20 @@ export interface SubPiece {
   finishingCostPerPiece: number;
   customFinishingDescription: string;
   postProcessingTimeMinutes: number;
-  laborTimeMinutes: number; // Dedicated labor/supervision time (separate from post-processing)
+  laborTimeMinutes: number; // Dedicated labor/assembly time (separate from post-processing and supervision)
 }
 
 // ─── Project shared params ───
 export interface ProjectParams {
+  printerModel: string;       // Printer DB id or 'custom'
   printerCost: number;
   printerLifespanHours: number;
   maintenanceCostPerHour: number;
   powerConsumptionWatts: number;
   electricityCostPerKWh: number;
-  laborCostPerHour: number;
+  laborCostPerHour: number;           // Rate for post-processing + direct manual work
+  supervisionCostPerHour: number;     // Rate for passive print supervision (15% of print time)
+  additionalLaborCostPerHour: number; // Rate for additional labor (applied to laborTimeMinutes)
   failureRate: number;
   overheadPercentage: number;
   taxRate: number;
@@ -54,6 +60,8 @@ export interface Project {
   selectedTier: PricingTier;
   subPieces: SubPiece[];
   params: ProjectParams;
+  currency: CurrencyCode;
+  locale: Locale;
 }
 
 // ─── Cost breakdown ───
@@ -65,7 +73,9 @@ export interface SubPieceCostBreakdown {
   printerDepreciation: number;
   electricityCost: number;
   maintenanceCost: number;
-  laborCost: number;
+  supervisionCost: number;      // Passive supervision cost
+  laborCost: number;            // Post-processing + direct labor
+  additionalLaborCost: number;  // Additional labor (assembly, etc.)
   finishingCost: number;
   failureCost: number;
   subtotalPerUnit: number;
@@ -109,66 +119,35 @@ export const FILAMENT_DEFAULTS: Record<FilamentType, { costPerKg: number }> = {
   PVA: { costPerKg: 50 },
   ASA: { costPerKg: 28 },
   PC: { costPerKg: 50 },
-  Custom: { costPerKg: 0 }, // No suggested price for custom
+  Custom: { costPerKg: 0 },
 };
 
 // ─── Sale type config ───
-export const SALE_TYPE_CONFIG: Record<SaleType, { label: string; description: string; marginMultiplier: number; subtitle: string }> = {
-  wholesale: { label: 'Mayorista', description: 'Venta al por mayor', marginMultiplier: 0.6, subtitle: '×0.6' },
-  retail: { label: 'Minorista', description: 'Venta al por menor', marginMultiplier: 1.0, subtitle: '×1.0' },
-  custom: { label: 'Personalizado', description: 'Multiplicador personalizado', marginMultiplier: 1.0, subtitle: 'Personalizar' },
-  rush: { label: 'Urgente', description: 'Pedido urgente con prioridad', marginMultiplier: 1.8, subtitle: '×1.8' },
+export const SALE_TYPE_CONFIG: Record<SaleType, { marginMultiplier: number; subtitle: string }> = {
+  wholesale: { marginMultiplier: 0.6, subtitle: '×0.6' },
+  retail: { marginMultiplier: 1.0, subtitle: '×1.0' },
+  custom: { marginMultiplier: 1.0, subtitle: 'Custom' },
+  rush: { marginMultiplier: 1.8, subtitle: '×1.8' },
 };
 
 // ─── Pricing tier config (Lujo = diamond blue) ───
 export const PRICING_TIER_CONFIG: Record<PricingTier, { label: string; description: string; baseMargin: number; color: string; accent: string; darkAccent: string }> = {
-  competitive: { label: 'Competitivo', description: 'Precio agresivo para competir', baseMargin: 0.25, color: 'sage', accent: 'bg-sage/15 text-sage border-sage/30', darkAccent: '#6B9E72' },
-  standard: { label: 'Estándar', description: 'Equilibrio entre beneficio y competitividad', baseMargin: 0.60, color: 'copper', accent: 'bg-copper/15 text-copper border-copper/30', darkAccent: '#C77D3A' },
-  premium: { label: 'Premium', description: 'Posicionamiento de calidad', baseMargin: 1.20, color: 'gold', accent: 'bg-gold/15 text-gold border-gold/30', darkAccent: '#D4A843' },
-  luxury: { label: 'Lujo', description: 'Servicio exclusivo y acabado premium', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
+  competitive: { label: 'Competitive', description: 'Aggressive pricing', baseMargin: 0.25, color: 'sage', accent: 'bg-sage/15 text-sage border-sage/30', darkAccent: '#6B9E72' },
+  standard: { label: 'Standard', description: 'Balanced margin', baseMargin: 0.60, color: 'copper', accent: 'bg-copper/15 text-copper border-copper/30', darkAccent: '#C77D3A' },
+  premium: { label: 'Premium', description: 'Quality positioning', baseMargin: 1.20, color: 'gold', accent: 'bg-gold/15 text-gold border-gold/30', darkAccent: '#D4A843' },
+  luxury: { label: 'Luxury', description: 'Exclusive service', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
 };
 
 // ─── Finishing defaults (custom has no suggested price) ───
-export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; description: string; subtitle: string }> = {
-  none: { costPerPiece: 0, description: 'Sin acabado', subtitle: 'Gratis' },
-  lightSanding: { costPerPiece: 2, description: 'Lijado ligero', subtitle: '~2€/pieza' },
-  fullSanding: { costPerPiece: 5, description: 'Lijado completo', subtitle: '~5€/pieza' },
-  primerPaint: { costPerPiece: 8, description: 'Imprimación y pintura base', subtitle: '~8€/pieza' },
-  fullPaint: { costPerPiece: 15, description: 'Pintura completa', subtitle: '~15€/pieza' },
-  vaporSmoothing: { costPerPiece: 6, description: 'Alisado por vapor', subtitle: '~6€/pieza' },
-  epoxyCoating: { costPerPiece: 10, description: 'Recubrimiento epoxi', subtitle: '~10€/pieza' },
-  custom: { costPerPiece: 0, description: 'Acabado personalizado', subtitle: 'Personalizar' },
-};
-
-// ─── Parameter tooltips ───
-export const PARAM_TOOLTIPS: Record<string, string> = {
-  printerCost: 'Precio de compra de la impresora. Se usa para calcular la depreciación por hora de uso.',
-  printerLifespanHours: 'Horas estimadas de vida útil de la impresora antes de necesitar reemplazo.',
-  maintenanceCostPerHour: 'Coste de mantenimiento preventivo y reparaciones por hora de impresión.',
-  powerConsumptionWatts: 'Consumo eléctrico medio de la impresora durante la impresión en vatios.',
-  electricityCostPerKWh: 'Precio de la electricidad por kilovatio-hora según tu compañía eléctrica.',
-  laborCostPerHour: 'Coste horario de mano de obra (supervisión de impresión + postprocesado).',
-  failureRate: 'Porcentaje de probabilidad de fallo en la impresión. Se añade como prima de riesgo.',
-  overheadPercentage: 'Porcentaje de gastos generales (alquiler, software, etc.) sobre el coste base.',
-  taxRate: 'Tipo impositivo del IVA/IGIC aplicable a la venta.',
-  packagingCostPerProject: 'Coste fijo de embalaje por proyecto (caja, relleno, cinta, etc.).',
-  shippingCostPerProject: 'Coste de envío por proyecto. Se añade al precio final.',
-  designTimeMinutes: 'Tiempo dedicado al diseño 3D del modelo (si aplica).',
-  designHourlyRate: 'Tarifa horaria para el tiempo de diseño del modelo.',
-  printWeight: 'Peso del filamento necesario para imprimir la pieza, en gramos.',
-  filamentCostPerKg: 'Precio del filamento por kilogramo. Varía según tipo y marca.',
-  printTime: 'Tiempo estimado de impresión. Afecta a depreciación, electricidad y mantenimiento.',
-  wastePercentage: 'Porcentaje extra de material para compensar purgas, soportes y fallos.',
-  quantity: 'Número de unidades idénticas de esta pieza.',
-  postProcessingTimeMinutes: 'Tiempo dedicado al postprocesado: retirar soportes, lijado, pintura, etc.',
-  laborTimeMinutes: 'Tiempo de supervisión/mano de obra directa (aparte del postprocesado). A diferencia del 15% automático del tiempo de impresión, este es tiempo de trabajo real.',
-  finishingType: 'Tipo de acabado aplicado a la pieza tras la impresión.',
-  finishingCostPerPiece: 'Coste del acabado por cada unidad de la pieza.',
-  customFilamentName: 'Nombre del filamento personalizado.',
-  color: 'Color del filamento usado para identificar la pieza visualmente.',
-  filamentType: 'Tipo de filamento. Determina el precio recomendado por kg.',
-  saleType: 'Tipo de venta. Afecta al multiplicador de margen: mayorista reduce, urgente aumenta.',
-  customMultiplier: 'Multiplicador de margen personalizado. Puedes introducir cualquier valor positivo.',
+export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; subtitle: string }> = {
+  none: { costPerPiece: 0, subtitle: 'Free' },
+  lightSanding: { costPerPiece: 2, subtitle: '~2€/pc' },
+  fullSanding: { costPerPiece: 5, subtitle: '~5€/pc' },
+  primerPaint: { costPerPiece: 8, subtitle: '~8€/pc' },
+  fullPaint: { costPerPiece: 15, subtitle: '~15€/pc' },
+  vaporSmoothing: { costPerPiece: 6, subtitle: '~6€/pc' },
+  epoxyCoating: { costPerPiece: 10, subtitle: '~10€/pc' },
+  custom: { costPerPiece: 0, subtitle: 'Custom' },
 };
 
 let _idCounter = 0;
@@ -177,7 +156,7 @@ export function generateProjectId(): string { return `proj_${Date.now()}_${++_id
 
 export function getDefaultSubPiece(): SubPiece {
   return {
-    id: generateId(), name: 'Pieza 1', color: '#C77D3A',
+    id: generateId(), name: 'Piece 1', color: '#C77D3A',
     filamentType: 'PLA', customFilamentName: '', filamentCostPerKg: 20,
     printWeight: 50, wastePercentage: 5,
     printTimeHours: 3, printTimeMinutes: 30,
@@ -189,8 +168,12 @@ export function getDefaultSubPiece(): SubPiece {
 
 export function getDefaultProjectParams(): ProjectParams {
   return {
+    printerModel: 'custom',
     printerCost: 300, printerLifespanHours: 5000, maintenanceCostPerHour: 0.10,
-    powerConsumptionWatts: 200, electricityCostPerKWh: 0.15, laborCostPerHour: 15,
+    powerConsumptionWatts: 200, electricityCostPerKWh: 0.15,
+    laborCostPerHour: 15,
+    supervisionCostPerHour: 12,
+    additionalLaborCostPerHour: 18,
     failureRate: 5, overheadPercentage: 10, taxRate: 21,
     packagingCostPerProject: 0.50, shippingCostPerProject: 0,
     designTimeMinutes: 0, designHourlyRate: 25,
@@ -199,8 +182,9 @@ export function getDefaultProjectParams(): ProjectParams {
 
 export function getDefaultProject(): Project {
   return {
-    id: generateProjectId(), name: 'Mi Proyecto', saleType: 'retail',
+    id: generateProjectId(), name: 'My Project', saleType: 'retail',
     customMultiplier: 1.4, selectedTier: 'standard',
     subPieces: [getDefaultSubPiece()], params: getDefaultProjectParams(),
+    currency: 'EUR', locale: 'es',
   };
 }

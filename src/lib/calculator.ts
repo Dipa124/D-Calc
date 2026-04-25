@@ -1,4 +1,4 @@
-// CalcFDM — Core FDM 3D Printing Price Calculation Engine (v4)
+// D-Calc — Core FDM 3D Printing Price Calculation Engine (v5)
 
 import type {
   SubPiece,
@@ -11,19 +11,21 @@ import type {
 } from './types';
 
 import { PRICING_TIER_CONFIG, SALE_TYPE_CONFIG } from './types';
+import { formatCurrencyValue } from './currency';
+import type { CurrencyCode } from './currency';
 
 // ─── Sale multiplier ───
 
 export function getSaleMultiplier(saleType: SaleType, customMultiplier: number): number {
   switch (saleType) {
     case 'wholesale':
-      return SALE_TYPE_CONFIG.wholesale.marginMultiplier; // 0.6
+      return SALE_TYPE_CONFIG.wholesale.marginMultiplier;
     case 'retail':
-      return SALE_TYPE_CONFIG.retail.marginMultiplier; // 1.0
+      return SALE_TYPE_CONFIG.retail.marginMultiplier;
     case 'custom':
       return customMultiplier;
     case 'rush':
-      return SALE_TYPE_CONFIG.rush.marginMultiplier; // 1.8
+      return SALE_TYPE_CONFIG.rush.marginMultiplier;
     default:
       return 1.0;
   }
@@ -38,13 +40,8 @@ export function calculateSubPiecePrice(
   customMultiplier: number,
   profitMargin: number,
 ): SubPieceCostBreakdown {
-  // Total print time in hours
   const totalPrintTimeHours = subPiece.printTimeHours + subPiece.printTimeMinutes / 60;
-
-  // Post-processing time in hours (removing supports, sanding, etc.)
   const postProcessingTimeHours = subPiece.postProcessingTimeMinutes / 60;
-
-  // Dedicated labor/supervision time in hours (explicit time the operator spends)
   const laborTimeHours = (subPiece.laborTimeMinutes || 0) / 60;
 
   // Material cost: weight in grams → kg, apply waste percentage
@@ -63,39 +60,39 @@ export function calculateSubPiecePrice(
   // Maintenance cost per hour × print time
   const maintenanceCost = params.maintenanceCostPerHour * totalPrintTimeHours;
 
-  // Labor cost:
-  // 1) 15% supervision factor for unattended print time (machine running = occasional check)
-  // 2) Full rate for dedicated labor time (explicit supervision/manual work)
-  // 3) Full rate for post-processing time (removing supports, sanding, etc.)
-  const laborCost =
-    params.laborCostPerHour * (
-      totalPrintTimeHours * 0.15 +  // Passive supervision during print
-      laborTimeHours +               // Active labor/supervision time
-      postProcessingTimeHours         // Post-processing work
-    );
+  // Supervision cost: passive monitoring at supervision rate × 15% of print time
+  const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.15;
+
+  // Labor cost: post-processing + direct manual work at labor rate
+  const laborCost = params.laborCostPerHour * (postProcessingTimeHours + laborTimeHours);
+
+  // Additional labor cost: assembly, preparation, etc. at additional labor rate
+  const additionalLaborCost = params.additionalLaborCostPerHour * laborTimeHours;
 
   // Finishing cost (per piece, already includes quantity)
   const finishingCost = subPiece.finishingCostPerPiece * subPiece.quantity;
 
   // Failure cost: risk premium on core costs
   const failureCost =
-    (materialCost + printerDepreciation + electricityCost + maintenanceCost + laborCost) *
+    (materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + laborCost + additionalLaborCost) *
     (params.failureRate / 100);
 
-  // Per-unit subtotal (finishingCostPerPiece is per piece, not total)
+  // Per-unit subtotal
   const subtotalPerUnit =
     materialCost +
     printerDepreciation +
     electricityCost +
     maintenanceCost +
+    supervisionCost +
     laborCost +
-    subPiece.finishingCostPerPiece +  // Per piece, not total
+    additionalLaborCost +
+    subPiece.finishingCostPerPiece +
     failureCost;
 
   // Overhead per unit
   const overheadPerUnit = subtotalPerUnit * (params.overheadPercentage / 100);
 
-  // Base cost per unit (cost before profit)
+  // Base cost per unit
   const baseCostPerUnit = subtotalPerUnit + overheadPerUnit;
 
   // Adjusted margin: base margin × sale type multiplier
@@ -124,8 +121,10 @@ export function calculateSubPiecePrice(
     printerDepreciation,
     electricityCost,
     maintenanceCost,
+    supervisionCost,
     laborCost,
-    finishingCost,  // This is total for all quantity
+    additionalLaborCost,
+    finishingCost,
     failureCost,
     subtotalPerUnit,
     overheadPerUnit,
@@ -144,46 +143,33 @@ const ALL_TIERS: PricingTier[] = ['competitive', 'standard', 'premium', 'luxury'
 
 export function calculateProjectPrice(project: Project): ProjectPricingResult[] {
   const { params, saleType, customMultiplier } = project;
-
-  // Design cost (project-level)
   const designCost = (params.designTimeMinutes / 60) * params.designHourlyRate;
 
   return ALL_TIERS.map((tier) => {
     const tierConfig = PRICING_TIER_CONFIG[tier];
     const profitMargin = tierConfig.baseMargin;
 
-    // Calculate breakdown for every sub-piece at this tier
     const subPieceBreakdowns = project.subPieces.map((sp) =>
       calculateSubPiecePrice(sp, params, saleType, customMultiplier, profitMargin),
     );
 
-    // Aggregate material cost (sum of materialCost × quantity)
     const totalMaterialCost = subPieceBreakdowns.reduce(
       (sum, b) => sum + b.materialCost * b.quantity,
       0,
     );
 
-    // Base cost = sum of per-unit base costs × quantity + design cost
     const totalBaseCost =
       subPieceBreakdowns.reduce((sum, b) => sum + b.baseCostPerUnit * b.quantity, 0) + designCost;
 
-    // Total profit = sum of per-unit profit × quantity
     const totalProfit = subPieceBreakdowns.reduce(
       (sum, b) => sum + b.profitPerUnit * b.quantity,
       0,
     );
 
-    // Price before tax
     const totalPriceBeforeTax = totalBaseCost + totalProfit;
-
-    // Tax on the pre-tax price
     const totalTax = totalPriceBeforeTax * (params.taxRate / 100);
-
-    // Project-level fixed costs
     const totalPackaging = params.packagingCostPerProject;
     const totalShipping = params.shippingCostPerProject;
-
-    // Grand total
     const totalProjectPrice = totalPriceBeforeTax + totalTax + totalPackaging + totalShipping;
 
     return {
@@ -206,10 +192,6 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
 
 // ─── Currency formatting ───
 
-export function formatCurrency(amount: number): string {
-  const fixed = Math.round(amount * 100) / 100;
-  const parts = fixed.toFixed(2).split('.');
-  const integerPart = parts[0];
-  const decimalPart = parts[1];
-  return `${integerPart},${decimalPart} €`;
+export function formatCurrency(amount: number, currency: CurrencyCode = 'EUR'): string {
+  return formatCurrencyValue(amount, currency);
 }
