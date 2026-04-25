@@ -2,9 +2,10 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SubPiece, FilamentType, FinishingType } from '@/lib/types'
-import { FILAMENT_DEFAULTS, FINISHING_DEFAULTS } from '@/lib/types'
-import { Trash2, ChevronDown, ChevronUp, Palette, Weight, Clock, Hash } from 'lucide-react'
+import { FILAMENT_DEFAULTS, FINISHING_DEFAULTS, PARAM_TOOLTIPS } from '@/lib/types'
+import { Trash2, ChevronDown, Palette, Weight, Clock, Hash, Pencil } from 'lucide-react'
 import { FinishTypeSelector } from './finish-type-selector'
+import { InfoTooltip } from './info-tooltip'
 import { useState } from 'react'
 
 interface SubPieceFormProps {
@@ -26,7 +27,6 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
     update({
       filamentType,
       filamentCostPerKg: defaults.costPerKg,
-      ...(filamentType === 'Custom' ? {} : {}),
     })
   }
 
@@ -47,15 +47,18 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
           className="w-4 h-4 rounded-full border-2 flex-shrink-0"
           style={{ backgroundColor: subPiece.color, borderColor: subPiece.color }}
         />
-        <input
-          type="text"
-          value={subPiece.name}
-          onChange={(e) => update({ name: e.target.value })}
-          onClick={(e) => e.stopPropagation()}
-          className="font-display font-semibold text-foreground bg-transparent border-none outline-none flex-1 text-sm"
-          placeholder="Nombre de la pieza"
-        />
-        <span className="text-xs text-muted-foreground font-mono">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <input
+            type="text"
+            value={subPiece.name}
+            onChange={(e) => update({ name: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            className="font-display font-semibold text-foreground bg-transparent border-none outline-none flex-1 text-sm min-w-0"
+            placeholder="Nombre de la pieza"
+          />
+          <Pencil className="w-3 h-3 text-muted-foreground/40 shrink-0" />
+        </div>
+        <span className="text-xs text-muted-foreground font-mono shrink-0">
           {subPiece.filamentType} · {subPiece.printWeight}g
         </span>
         <motion.button
@@ -90,6 +93,7 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <Palette className="w-3.5 h-3.5" /> Color del filamento
+                    <InfoTooltip text={PARAM_TOOLTIPS.color} />
                   </label>
                   <div className="flex items-center gap-3">
                     <div className="relative">
@@ -108,6 +112,7 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <Weight className="w-3.5 h-3.5" /> Tipo de filamento
+                    <InfoTooltip text={PARAM_TOOLTIPS.filamentType} />
                   </label>
                   <select
                     value={subPiece.filamentType}
@@ -116,7 +121,7 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                   >
                     {(Object.entries(FILAMENT_DEFAULTS) as [FilamentType, typeof FILAMENT_DEFAULTS[FilamentType]][]).map(([type, config]) => (
                       <option key={type} value={type}>
-                        {type} — {config.costPerKg}€/kg ({config.description})
+                        {type === 'Custom' ? 'Personalizado' : `${type} — ${config.costPerKg}€/kg`}
                       </option>
                     ))}
                   </select>
@@ -132,11 +137,13 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                 </div>
               </div>
 
-              {/* Numeric fields */}
+              {/* Numeric fields — Row 1 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* Weight */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Peso (g)</label>
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    Peso (g) <InfoTooltip text={PARAM_TOOLTIPS.printWeight} />
+                  </label>
                   <input
                     type="number"
                     value={subPiece.printWeight}
@@ -149,7 +156,9 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
 
                 {/* Filament cost */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Coste (€/kg)</label>
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    Coste (€/kg) <InfoTooltip text={PARAM_TOOLTIPS.filamentCostPerKg} />
+                  </label>
                   <input
                     type="number"
                     value={subPiece.filamentCostPerKg}
@@ -163,7 +172,7 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                 {/* Print time hours */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Horas
+                    <Clock className="w-3 h-3" /> Horas <InfoTooltip text={PARAM_TOOLTIPS.printTime} />
                   </label>
                   <input
                     type="number"
@@ -188,12 +197,12 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                 </div>
               </div>
 
-              {/* Second row of numeric fields */}
+              {/* Numeric fields — Row 2 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* Quantity */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Hash className="w-3 h-3" /> Cantidad
+                    <Hash className="w-3 h-3" /> Cantidad <InfoTooltip text={PARAM_TOOLTIPS.quantity} />
                   </label>
                   <input
                     type="number"
@@ -206,11 +215,8 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
 
                 {/* Waste percentage */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Desperdicio (%)
-                    <span className="block text-[10px] text-muted-foreground/70 font-normal">
-                     Sobre el peso de la pieza
-                    </span>
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    Desperdicio (%) <InfoTooltip text={PARAM_TOOLTIPS.wastePercentage} />
                   </label>
                   <input
                     type="number"
@@ -225,8 +231,8 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
 
                 {/* Post processing time */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Postprocesado (min)
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    Postprocesado (min) <InfoTooltip text={PARAM_TOOLTIPS.postProcessingTimeMinutes} />
                   </label>
                   <input
                     type="number"
@@ -237,17 +243,26 @@ export function SubPieceForm({ subPiece, index, onChange, onRemove }: SubPieceFo
                   />
                 </div>
 
-                {/* Waste info tooltip */}
-                <div className="space-y-1.5 flex items-end">
-                  <div className="text-[10px] text-muted-foreground bg-secondary/50 rounded-lg p-2 leading-relaxed">
-                    💡 El % de desperdicio se aplica sobre el peso de la pieza para compensar material perdido en purgas, soportes y fallos.
-                  </div>
+                {/* Labor time */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    Mano obra (min) <InfoTooltip text={PARAM_TOOLTIPS.laborTimeMinutes} />
+                  </label>
+                  <input
+                    type="number"
+                    value={subPiece.laborTimeMinutes ?? 0}
+                    onChange={(e) => update({ laborTimeMinutes: Math.max(0, parseInt(e.target.value) || 0) })}
+                    min={0}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper font-mono"
+                  />
                 </div>
               </div>
 
               {/* Finish type selector */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">Tipo de acabado</label>
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  Tipo de acabado <InfoTooltip text={PARAM_TOOLTIPS.finishingType} />
+                </label>
                 <FinishTypeSelector
                   value={subPiece.finishingType}
                   customCost={subPiece.finishingCostPerPiece}

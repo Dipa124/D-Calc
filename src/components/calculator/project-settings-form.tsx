@@ -1,9 +1,11 @@
 'use client'
 
 import type { ProjectParams } from '@/lib/types'
+import { PARAM_TOOLTIPS } from '@/lib/types'
 import { Settings, Printer, Zap, Wrench, Clock, DollarSign, Percent, Package, Truck, PenTool } from 'lucide-react'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { InfoTooltip } from './info-tooltip'
 
 interface ProjectSettingsFormProps {
   params: ProjectParams
@@ -24,6 +26,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<Printer className="w-3.5 h-3.5" />}
           label="Coste impresora (€)"
+          tooltipKey="printerCost"
           value={params.printerCost}
           onChange={(v) => update({ printerCost: v })}
           min={0}
@@ -32,6 +35,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<Clock className="w-3.5 h-3.5" />}
           label="Vida útil (horas)"
+          tooltipKey="printerLifespanHours"
           value={params.printerLifespanHours}
           onChange={(v) => update({ printerLifespanHours: v })}
           min={100}
@@ -40,6 +44,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<Wrench className="w-3.5 h-3.5" />}
           label="Mant. (€/h)"
+          tooltipKey="maintenanceCostPerHour"
           value={params.maintenanceCostPerHour}
           onChange={(v) => update({ maintenanceCostPerHour: v })}
           min={0}
@@ -48,6 +53,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<Zap className="w-3.5 h-3.5" />}
           label="Consumo (W)"
+          tooltipKey="powerConsumptionWatts"
           value={params.powerConsumptionWatts}
           onChange={(v) => update({ powerConsumptionWatts: v })}
           min={0}
@@ -56,6 +62,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<DollarSign className="w-3.5 h-3.5" />}
           label="Electricidad (€/kWh)"
+          tooltipKey="electricityCostPerKWh"
           value={params.electricityCostPerKWh}
           onChange={(v) => update({ electricityCostPerKWh: v })}
           min={0}
@@ -64,6 +71,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
         <ParamField
           icon={<Clock className="w-3.5 h-3.5" />}
           label="Mano obra (€/h)"
+          tooltipKey="laborCostPerHour"
           value={params.laborCostPerHour}
           onChange={(v) => update({ laborCostPerHour: v })}
           min={0}
@@ -94,6 +102,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<Percent className="w-3.5 h-3.5" />}
                 label="Tasa fallo (%)"
+                tooltipKey="failureRate"
                 value={params.failureRate}
                 onChange={(v) => update({ failureRate: v })}
                 min={0}
@@ -103,6 +112,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<Percent className="w-3.5 h-3.5" />}
                 label="Overhead (%)"
+                tooltipKey="overheadPercentage"
                 value={params.overheadPercentage}
                 onChange={(v) => update({ overheadPercentage: v })}
                 min={0}
@@ -112,6 +122,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<Percent className="w-3.5 h-3.5" />}
                 label="IVA (%)"
+                tooltipKey="taxRate"
                 value={params.taxRate}
                 onChange={(v) => update({ taxRate: v })}
                 min={0}
@@ -121,6 +132,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<Package className="w-3.5 h-3.5" />}
                 label="Embalaje (€)"
+                tooltipKey="packagingCostPerProject"
                 value={params.packagingCostPerProject}
                 onChange={(v) => update({ packagingCostPerProject: v })}
                 min={0}
@@ -129,6 +141,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<Truck className="w-3.5 h-3.5" />}
                 label="Envío (€)"
+                tooltipKey="shippingCostPerProject"
                 value={params.shippingCostPerProject}
                 onChange={(v) => update({ shippingCostPerProject: v })}
                 min={0}
@@ -137,6 +150,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<PenTool className="w-3.5 h-3.5" />}
                 label="Diseño (min)"
+                tooltipKey="designTimeMinutes"
                 value={params.designTimeMinutes}
                 onChange={(v) => update({ designTimeMinutes: v })}
                 min={0}
@@ -145,6 +159,7 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
               <ParamField
                 icon={<DollarSign className="w-3.5 h-3.5" />}
                 label="Tarifa diseño (€/h)"
+                tooltipKey="designHourlyRate"
                 value={params.designHourlyRate}
                 onChange={(v) => update({ designHourlyRate: v })}
                 min={0}
@@ -158,22 +173,26 @@ export function ProjectSettingsForm({ params, onChange }: ProjectSettingsFormPro
   )
 }
 
-// Reusable parameter field component
+// Reusable parameter field component with tooltip
 function ParamField({
-  icon, label, value, onChange, min = 0, max, step = 1
+  icon, label, tooltipKey, value, onChange, min = 0, max, step = 1
 }: {
   icon: React.ReactNode
   label: string
+  tooltipKey: string
   value: number
   onChange: (v: number) => void
   min?: number
   max?: number
   step?: number
 }) {
+  const tooltipText = PARAM_TOOLTIPS[tooltipKey] || ''
+
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
         {icon} {label}
+        {tooltipText && <InfoTooltip text={tooltipText} />}
       </label>
       <input
         type="number"

@@ -1,9 +1,10 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { FinishingType } from '@/lib/types'
-import { FINISHING_DEFAULTS } from '@/lib/types'
+import { FINISHING_DEFAULTS, PARAM_TOOLTIPS } from '@/lib/types'
 import { CircleOff, Paintbrush, PaintBucket, SprayCan, Sparkles, Cloud, Droplets, Wrench } from 'lucide-react'
+import { InfoTooltip } from './info-tooltip'
 
 const FINISH_ICONS: Record<FinishingType, React.ReactNode> = {
   none: <CircleOff className="w-4 h-4" />,
@@ -76,45 +77,54 @@ export function FinishTypeSelector({
         })}
       </div>
 
-      {/* Custom finish inputs */}
-      {value === 'custom' && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="space-y-3 p-3 rounded-lg bg-copper/10 dark:bg-copper/10 border border-copper/20"
-        >
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-foreground whitespace-nowrap">
-              Coste por pieza:
-            </label>
-            <div className="flex items-center gap-1 flex-1">
-              <input
-                type="range"
-                min={0}
-                max={50}
-                step={0.5}
-                value={customCost}
-                onChange={(e) => onCustomCostChange(parseFloat(e.target.value))}
-                className="flex-1"
-              />
-              <span className="font-mono font-bold text-copper min-w-[4rem] text-right">
-                {customCost.toFixed(1)} €
-              </span>
+      {/* Custom finish inputs — number input with no artificial cap */}
+      <AnimatePresence>
+        {value === 'custom' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-3 p-3 rounded-lg bg-copper/10 dark:bg-copper/10 border border-copper/20"
+          >
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-foreground whitespace-nowrap flex items-center gap-1.5">
+                Coste por pieza
+                <InfoTooltip text={PARAM_TOOLTIPS.finishingCostPerPiece} side="right" />
+              </label>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={customCost}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value)
+                    if (!isNaN(val) && val >= 0) {
+                      onCustomCostChange(val)
+                    }
+                  }}
+                  className="flex-1 max-w-[120px] px-3 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono
+                    focus:outline-none focus:ring-2 focus:ring-copper"
+                />
+                <span className="font-mono font-bold text-copper min-w-[4rem] text-right">
+                  {customCost.toFixed(1)} €
+                </span>
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Descripción del acabado:</label>
-            <input
-              type="text"
-              value={customDescription}
-              onChange={(e) => onCustomDescriptionChange(e.target.value)}
-              placeholder="Ej: Pulido con llama, recubrimiento cerámico..."
-              className="w-full mt-1 px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-copper"
-            />
-          </div>
-        </motion.div>
-      )}
+            <div>
+              <label className="text-sm font-medium text-foreground">Descripción del acabado:</label>
+              <input
+                type="text"
+                value={customDescription}
+                onChange={(e) => onCustomDescriptionChange(e.target.value)}
+                placeholder="Ej: Pulido con llama, recubrimiento cerámico..."
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-copper"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,22 +1,25 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSession } from 'next-auth/react'
 import {
   Plus, Printer, ChevronDown,
   Calculator, Layers, DollarSign, FileDown,
   Copy, Check, Clock, Weight, Hash, Package, RotateCcw,
-  Sparkles,
+  Sparkles, Settings, Pencil, PanelLeftClose, PanelLeft,
+  Save, Loader2, LogIn, ShoppingBag,
 } from 'lucide-react'
 import type {
-  Project, SubPiece, SaleType, PricingTier, ProjectPricingResult
+  Project, SubPiece, SaleType, PricingTier
 } from '@/lib/types'
 import {
-  generateId, getDefaultProject, getDefaultSubPiece,
+  generateId, getDefaultSubPiece,
 } from '@/lib/types'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
 import { useToast } from '@/hooks/use-toast'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { ThemeToggle } from '@/components/calculator/theme-toggle'
 import { SaleTypeSelector } from '@/components/calculator/sale-type-selector'
 import { SubPieceForm } from '@/components/calculator/sub-piece-form'
@@ -24,6 +27,8 @@ import { ProjectSettingsForm } from '@/components/calculator/project-settings-fo
 import { PriceResults } from '@/components/calculator/price-results'
 import { CostBreakdown } from '@/components/calculator/cost-breakdown'
 import { ExportOptions } from '@/components/calculator/export-options'
+import { AuthPanel } from '@/components/calculator/auth-panel'
+import { Dashboard } from '@/components/calculator/dashboard'
 
 // ─── Floating particles config ───
 const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
@@ -35,11 +40,17 @@ const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
 }))
 
 export default function Home() {
+  const { data: session } = useSession()
   const { project, setProject, resetProject, hasStoredData } = usePersistedProject()
   const [showSettings, setShowSettings] = useState(false)
   const [showBreakdown, setShowBreakdown] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
+  const [savingProject, setSavingProject] = useState(false)
+  const [recordingSale, setRecordingSale] = useState(false)
 
+  useIsMobile() // trigger responsive detection
   const { toast } = useToast()
 
   // ─── Calculations ───
@@ -95,10 +106,121 @@ export default function Home() {
     })
   }, [selectedResult.totalProjectPrice, toast])
 
+  // ─── Save project to DB ───
+  const handleSaveProject = useCallback(async () => {
+    if (!session?.user?.id) return
+    setSavingProject(true)
+    try {
+      // Check if project already exists in DB by trying to find it
+      const listRes = await fetch('/api/projects')
+      if (listRes.ok) {
+        const projects = await listRes.json()
+        const existing = projects.find((p: { data: string }) => {
+          try {
+            const d = JSON.parse(p.data)
+            return d.id === project.id
+          } catch { return false }
+        })
+
+        if (existing) {
+          // Update existing project
+          const res = await fetch(`/api/projects/${existing.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: project.name, data: project }),
+          })
+          if (!res.ok) throw new Error('Error al actualizar')
+          toast({ title: 'Proyecto actualizado', description: `"${project.name}" guardado correctamente` })
+        } else {
+          // Create new project
+          const res = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: project.name, data: project }),
+          })
+          if (!res.ok) throw new Error('Error al guardar')
+          toast({ title: 'Proyecto guardado', description: `"${project.name}" guardado en tu cuenta` })
+        }
+      }
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo guardar el proyecto', variant: 'destructive' })
+    } finally {
+      setSavingProject(false)
+    }
+  }, [session?.user?.id, project, toast])
+
+  // ─── Record sale ───
+  const handleRecordSale = useCallback(async () => {
+    if (!session?.user?.id) return
+    setRecordingSale(true)
+    try {
+      // First, save the project
+      const listRes = await fetch('/api/projects')
+      let projectId = ''
+      if (listRes.ok) {
+        const projects = await listRes.json()
+        const existing = projects.find((p: { data: string }) => {
+          try {
+            const d = JSON.parse(p.data)
+            return d.id === project.id
+          } catch { return false }
+        })
+
+        if (existing) {
+          projectId = existing.id
+          // Update the project data
+          await fetch(`/api/projects/${existing.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: project.name, data: project }),
+          })
+        } else {
+          const createRes = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: project.name, data: project }),
+          })
+          if (createRes.ok) {
+            const created = await createRes.json()
+            projectId = created.id
+          }
+        }
+      }
+
+      if (!projectId) throw new Error('No se pudo obtener el proyecto')
+
+      // Record the sale
+      const saleRes = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          projectName: project.name,
+          tier: project.selectedTier,
+          saleType: project.saleType,
+          quantity: totalPieces,
+          unitPrice: selectedResult.totalProjectPrice / (totalPieces || 1),
+          totalPrice: selectedResult.totalProjectPrice,
+        }),
+      })
+
+      if (!saleRes.ok) throw new Error('Error al registrar venta')
+
+      toast({
+        title: 'Venta registrada',
+        description: `${formatCurrency(selectedResult.totalProjectPrice)} — ${project.name}`,
+      })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo registrar la venta', variant: 'destructive' })
+    } finally {
+      setRecordingSale(false)
+    }
+  }, [session?.user?.id, project, selectedResult, totalPieces, toast])
+
   // ─── Animation variants ───
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+    visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.1 } },
   }
   const sectionVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -130,7 +252,7 @@ export default function Home() {
 
       {/* ─── Header ─── */}
       <header className="sticky top-0 z-50 glass-card border-b border-border/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <motion.div
               className="w-10 h-10 rounded-xl bg-gradient-to-br from-copper to-gold flex items-center justify-center shadow-lg shadow-copper/20"
@@ -152,7 +274,7 @@ export default function Home() {
               key={selectedResult.totalProjectPrice.toFixed(2)}
               initial={{ scale: 1.1, opacity: 0.7 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="hidden md:flex items-center gap-1.5 ml-3 px-3 py-1.5 rounded-full bg-copper/10 border border-copper/20 pulse-glow-copper"
+              className="hidden md:flex items-center gap-1.5 ml-4 px-3 py-1.5 rounded-full bg-copper/10 border border-copper/20 pulse-glow-copper"
             >
               <DollarSign className="w-3.5 h-3.5 text-copper" />
               <span className="font-display font-bold text-sm text-copper">
@@ -173,6 +295,25 @@ export default function Home() {
                 {formatCurrency(selectedResult.totalProjectPrice)}
               </span>
             </motion.div>
+
+            {/* Save project button (authenticated only) */}
+            {session?.user && (
+              <motion.button
+                onClick={handleSaveProject}
+                disabled={savingProject}
+                className="w-9 h-9 rounded-lg bg-sage/15 hover:bg-sage/25 border border-sage/30 flex items-center justify-center transition-colors disabled:opacity-50"
+                whileTap={{ scale: 0.9 }}
+                aria-label="Guardar proyecto"
+                title="Guardar proyecto"
+              >
+                {savingProject ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-sage" />
+                ) : (
+                  <Save className="w-4 h-4 text-sage" />
+                )}
+              </motion.button>
+            )}
+
             {hasStoredData && (
               <motion.button
                 onClick={resetProject}
@@ -185,13 +326,14 @@ export default function Home() {
               </motion.button>
             )}
             <ThemeToggle />
+            <AuthPanel onDashboardClick={() => setShowDashboard(true)} />
           </div>
         </div>
       </header>
 
       {/* ─── Summary Bar ─── */}
       <div className="sticky top-[57px] z-40 glass-card border-b border-border/30 shimmer">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-2">
           <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto">
             <SummaryStat icon={<Hash className="w-3 h-3 text-sage" />} bgClass="bg-sage/15" label="Piezas" value={totalPieces.toString()} />
             <Divider />
@@ -233,37 +375,77 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ─── Main Content: 2-column on desktop, 1-column on mobile ─── */}
+      {/* ─── Main Content ─── */}
       <motion.main
-        className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 relative z-10"
+        className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 py-6 relative z-10"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
-        {/* Hero title */}
-        <motion.section variants={sectionVariants} className="mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center">
-              <Layers className="w-4 h-4 text-copper" />
-            </div>
-            <input
-              type="text"
-              value={project.name}
-              onChange={(e) => updateProject({ name: e.target.value })}
-              className="font-display font-extrabold text-2xl sm:text-3xl text-foreground bg-transparent border-none outline-none flex-1 placeholder:text-muted-foreground animated-underline"
-              placeholder="Nombre del proyecto"
-            />
-          </div>
-        </motion.section>
+        {/* ── Desktop: 3-panel layout ── */}
+        {/* ── Tablet: 2-panel layout ── */}
+        {/* ── Mobile: stacked ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
 
-        {/* Desktop: 2-column layout. Mobile: stacked */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* ═══ LEFT SIDEBAR — Settings (desktop only) ═══ */}
+          <motion.div
+            variants={sectionVariants}
+            className={`hidden lg:flex flex-col gap-5 ${sidebarCollapsed ? 'lg:col-span-1' : 'lg:col-span-3'}`}
+          >
+            {/* Sidebar collapse toggle */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors self-end"
+            >
+              {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+              {sidebarCollapsed ? '' : 'Contraer'}
+            </button>
 
-          {/* ─── LEFT COLUMN (inputs) ─── */}
-          <div className="lg:col-span-5 space-y-5">
+            {!sidebarCollapsed && (
+              <>
+                {/* Sale type */}
+                <div className="glass-card section-card p-5">
+                  <SectionTitle icon={<DollarSign className="w-4 h-4" />} title="Tipo de venta" />
+                  <SaleTypeSelector
+                    value={project.saleType}
+                    customMultiplier={project.customMultiplier}
+                    onChange={(saleType: SaleType) => updateProject({ saleType })}
+                    onCustomMultiplierChange={(customMultiplier: number) => updateProject({ customMultiplier })}
+                  />
+                </div>
 
-            {/* Sale type */}
-            <motion.section variants={sectionVariants} className="glass-card section-card p-5">
+                {/* Settings */}
+                <div className="glass-card section-card p-5">
+                  <SectionTitle icon={<Settings className="w-4 h-4" />} title="Parámetros" />
+                  <ProjectSettingsForm params={project.params} onChange={updateParams} />
+                </div>
+              </>
+            )}
+          </motion.div>
+
+          {/* ═══ MAIN — Pieces / Calculator ═══ */}
+          <div className={`md:col-span-1 ${sidebarCollapsed ? 'lg:col-span-6' : 'lg:col-span-5'} space-y-5`}>
+            {/* Project name */}
+            <motion.section variants={sectionVariants} className="mb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center">
+                  <Layers className="w-4 h-4 text-copper" />
+                </div>
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={project.name}
+                    onChange={(e) => updateProject({ name: e.target.value })}
+                    className="font-display font-extrabold text-2xl sm:text-3xl text-foreground bg-transparent border-none outline-none flex-1 placeholder:text-muted-foreground animated-underline"
+                    placeholder="Nombre del proyecto"
+                  />
+                  <Pencil className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                </div>
+              </div>
+            </motion.section>
+
+            {/* Mobile/tablet: Sale type (shown inline) */}
+            <motion.section variants={sectionVariants} className="glass-card section-card p-5 lg:hidden">
               <SectionTitle icon={<DollarSign className="w-4 h-4" />} title="Tipo de venta" />
               <SaleTypeSelector
                 value={project.saleType}
@@ -326,8 +508,8 @@ export default function Home() {
               )}
             </motion.section>
 
-            {/* Settings */}
-            <motion.section variants={sectionVariants} className="glass-card section-card overflow-hidden">
+            {/* Mobile/tablet: Settings (collapsible) */}
+            <motion.section variants={sectionVariants} className="glass-card section-card overflow-hidden lg:hidden">
               <button onClick={() => setShowSettings(!showSettings)} className="w-full flex items-center justify-between p-5">
                 <SectionTitle icon={<Calculator className="w-4 h-4" />} title="Parámetros de impresión" />
                 <motion.div animate={{ rotate: showSettings ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -344,12 +526,36 @@ export default function Home() {
                 )}
               </AnimatePresence>
             </motion.section>
+
+
           </div>
 
-          {/* ─── RIGHT COLUMN (results) ─── */}
-          <div className="lg:col-span-7 space-y-5">
+          {/* ═══ RIGHT PANEL — Results ═══ */}
+          <div className={`md:col-span-1 ${sidebarCollapsed ? 'lg:col-span-5' : 'lg:col-span-4'} space-y-5`}>
+            {/* Guest banner — show when NOT authenticated */}
+            {!session?.user && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card p-4 border border-copper/20 bg-copper/5"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-copper/15 flex items-center justify-center shrink-0 mt-0.5">
+                    <LogIn className="w-4 h-4 text-copper" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      Guarda tus proyectos
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Inicia sesión para guardar proyectos, registrar ventas y acceder a estadísticas.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
-            {/* Price results + horizontal breakdown bar */}
+            {/* Price results + breakdown bar */}
             <motion.section variants={sectionVariants}>
               <SectionTitle icon={<Sparkles className="w-4 h-4" />} title="Precios sugeridos" />
               <PriceResults
@@ -378,6 +584,26 @@ export default function Home() {
               </AnimatePresence>
             </motion.section>
 
+            {/* Record Sale button (authenticated only) */}
+            {session?.user && project.subPieces.length > 0 && (
+              <motion.section variants={sectionVariants}>
+                <motion.button
+                  onClick={handleRecordSale}
+                  disabled={recordingSale}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-sage to-sage/80 text-white font-display font-semibold text-sm
+                    hover:shadow-lg hover:shadow-sage/20 transition-all disabled:opacity-50"
+                  whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}
+                >
+                  {recordingSale ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShoppingBag className="w-4 h-4" />
+                  )}
+                  Registrar venta
+                </motion.button>
+              </motion.section>
+            )}
+
             {/* Export */}
             <motion.section variants={sectionVariants} className="glass-card section-card p-5">
               <SectionTitle icon={<FileDown className="w-4 h-4" />} title="Exportar" />
@@ -392,6 +618,13 @@ export default function Home() {
         <p className="font-display">Calc<span className="text-copper">FDM</span> — Calculadora profesional de impresión 3D FDM</p>
         <p className="mt-1 text-[10px]">Los precios son estimaciones basadas en los parámetros introducidos</p>
       </footer>
+
+      {/* Dashboard overlay */}
+      <AnimatePresence>
+        {showDashboard && session?.user && (
+          <Dashboard onClose={() => setShowDashboard(false)} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

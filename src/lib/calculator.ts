@@ -1,4 +1,4 @@
-// CalcFDM — Core FDM 3D Printing Price Calculation Engine
+// CalcFDM — Core FDM 3D Printing Price Calculation Engine (v4)
 
 import type {
   SubPiece,
@@ -41,8 +41,11 @@ export function calculateSubPiecePrice(
   // Total print time in hours
   const totalPrintTimeHours = subPiece.printTimeHours + subPiece.printTimeMinutes / 60;
 
-  // Post-processing time in hours
+  // Post-processing time in hours (removing supports, sanding, etc.)
   const postProcessingTimeHours = subPiece.postProcessingTimeMinutes / 60;
+
+  // Dedicated labor/supervision time in hours (explicit time the operator spends)
+  const laborTimeHours = (subPiece.laborTimeMinutes || 0) / 60;
 
   // Material cost: weight in grams → kg, apply waste percentage
   const materialCost =
@@ -60,11 +63,18 @@ export function calculateSubPiecePrice(
   // Maintenance cost per hour × print time
   const maintenanceCost = params.maintenanceCostPerHour * totalPrintTimeHours;
 
-  // Labor: 15% supervision factor for print time + full post-processing time
+  // Labor cost:
+  // 1) 15% supervision factor for unattended print time (machine running = occasional check)
+  // 2) Full rate for dedicated labor time (explicit supervision/manual work)
+  // 3) Full rate for post-processing time (removing supports, sanding, etc.)
   const laborCost =
-    params.laborCostPerHour * (totalPrintTimeHours * 0.15 + postProcessingTimeHours);
+    params.laborCostPerHour * (
+      totalPrintTimeHours * 0.15 +  // Passive supervision during print
+      laborTimeHours +               // Active labor/supervision time
+      postProcessingTimeHours         // Post-processing work
+    );
 
-  // Finishing cost total for the quantity
+  // Finishing cost (per piece, already includes quantity)
   const finishingCost = subPiece.finishingCostPerPiece * subPiece.quantity;
 
   // Failure cost: risk premium on core costs
@@ -72,14 +82,14 @@ export function calculateSubPiecePrice(
     (materialCost + printerDepreciation + electricityCost + maintenanceCost + laborCost) *
     (params.failureRate / 100);
 
-  // Per-unit subtotal (finishingCostPerPiece is already per piece)
+  // Per-unit subtotal (finishingCostPerPiece is per piece, not total)
   const subtotalPerUnit =
     materialCost +
     printerDepreciation +
     electricityCost +
     maintenanceCost +
     laborCost +
-    subPiece.finishingCostPerPiece +
+    subPiece.finishingCostPerPiece +  // Per piece, not total
     failureCost;
 
   // Overhead per unit
@@ -115,7 +125,7 @@ export function calculateSubPiecePrice(
     electricityCost,
     maintenanceCost,
     laborCost,
-    finishingCost,
+    finishingCost,  // This is total for all quantity
     failureCost,
     subtotalPerUnit,
     overheadPerUnit,
@@ -197,7 +207,6 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
 // ─── Currency formatting ───
 
 export function formatCurrency(amount: number): string {
-  // Round to 2 decimal places and use comma as decimal separator (Euro format)
   const fixed = Math.round(amount * 100) / 100;
   const parts = fixed.toFixed(2).split('.');
   const integerPart = parts[0];

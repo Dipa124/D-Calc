@@ -1,9 +1,10 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { SaleType } from '@/lib/types'
-import { SALE_TYPE_CONFIG } from '@/lib/types'
+import { SALE_TYPE_CONFIG, PARAM_TOOLTIPS } from '@/lib/types'
 import { Package, Store, Settings, Zap } from 'lucide-react'
+import { InfoTooltip } from './info-tooltip'
 
 const SALE_ICONS: Record<SaleType, React.ReactNode> = {
   wholesale: <Package className="w-5 h-5" />,
@@ -65,31 +66,40 @@ export function SaleTypeSelector({ value, customMultiplier, onChange, onCustomMu
         })}
       </div>
 
-      {/* Custom multiplier input */}
-      {value === 'custom' && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="flex items-center gap-3 p-3 rounded-lg bg-copper/10 dark:bg-copper/10 border border-copper/20"
-        >
-          <label className="text-sm font-medium text-foreground whitespace-nowrap">
-            Multiplicador:
-          </label>
-          <input
-            type="range"
-            min={0.1}
-            max={5}
-            step={0.1}
-            value={customMultiplier}
-            onChange={(e) => onCustomMultiplierChange(parseFloat(e.target.value))}
-            className="flex-1"
-          />
-          <span className="font-mono font-bold text-copper min-w-[3rem] text-right">
-            ×{customMultiplier.toFixed(1)}
-          </span>
-        </motion.div>
-      )}
+      {/* Custom multiplier input — number input with no artificial cap */}
+      <AnimatePresence>
+        {value === 'custom' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex items-center gap-3 p-3 rounded-lg bg-copper/10 dark:bg-copper/10 border border-copper/20"
+          >
+            <label className="text-sm font-medium text-foreground whitespace-nowrap flex items-center gap-1.5">
+              Multiplicador
+              <InfoTooltip text={PARAM_TOOLTIPS.customMultiplier} side="right" />
+            </label>
+            <input
+              type="number"
+              min={0.01}
+              step={0.1}
+              value={customMultiplier}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value)
+                if (!isNaN(val) && val > 0) {
+                  onCustomMultiplierChange(val)
+                }
+              }}
+              className="flex-1 max-w-[120px] px-3 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono
+                focus:outline-none focus:ring-2 focus:ring-copper"
+            />
+            <span className="font-mono font-bold text-copper min-w-[3rem] text-right">
+              ×{customMultiplier.toFixed(1)}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

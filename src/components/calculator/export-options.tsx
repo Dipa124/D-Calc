@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import type { Project, ProjectPricingResult } from '@/lib/types'
 import { PRICING_TIER_CONFIG } from '@/lib/types'
 import { formatCurrency } from '@/lib/calculator'
-import { FileText, Ticket, Download } from 'lucide-react'
+import { FileText, Ticket } from 'lucide-react'
 
 interface ExportOptionsProps {
   project: Project
@@ -16,7 +16,7 @@ export function ExportOptions({ project, selectedResult }: ExportOptionsProps) {
     const tierConfig = PRICING_TIER_CONFIG[selectedResult.tier]
     const date = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
 
-    let html = `
+    const html = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -148,14 +148,14 @@ export function ExportOptions({ project, selectedResult }: ExportOptionsProps) {
 </body>
 </html>`
 
-    openPrintWindow(html, `Reporte_${project.name}_Productor`)
+    printHtml(html, `Reporte_${project.name}_Productor`)
   }
 
   const generateBuyerTicket = () => {
     const tierConfig = PRICING_TIER_CONFIG[selectedResult.tier]
     const date = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
 
-    let html = `
+    const html = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -239,29 +239,61 @@ export function ExportOptions({ project, selectedResult }: ExportOptionsProps) {
 </body>
 </html>`
 
-    openPrintWindow(html, `Presupuesto_${project.name}`)
+    printHtml(html, `Presupuesto_${project.name}`)
   }
 
-  const openPrintWindow = (html: string, title: string) => {
-    const win = window.open('', '_blank')
-    if (!win) {
-      // Fallback: create a blob and download
-      const blob = new Blob([html], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${title}.html`
-      a.click()
-      URL.revokeObjectURL(url)
+  /**
+   * Print HTML using a hidden iframe to avoid "about:blank" appearing
+   * in the printed document's footer/header.
+   */
+  const printHtml = (html: string, title: string) => {
+    // Create a hidden iframe
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.title = title
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentWindow?.document
+    if (!doc) {
+      document.body.removeChild(iframe)
+      // Fallback: download as HTML file
+      downloadHtml(html, title)
       return
     }
-    win.document.write(html)
-    win.document.title = title
-    win.document.close()
-    // Auto-trigger print dialog after a short delay
+
+    doc.open()
+    doc.write(html)
+    doc.close()
+
+    // Wait for content to render, then print
     setTimeout(() => {
-      win.print()
-    }, 500)
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } catch {
+        // If print fails, fall back to download
+        downloadHtml(html, title)
+      }
+      // Clean up the iframe after a delay
+      setTimeout(() => {
+        try { document.body.removeChild(iframe) } catch { /* already removed */ }
+      }, 1000)
+    }, 400)
+  }
+
+  const downloadHtml = (html: string, title: string) => {
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title}.html`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
