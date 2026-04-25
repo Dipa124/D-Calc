@@ -122,7 +122,7 @@ export const PRICING_TIER_CONFIG: Record<PricingTier, { label: string; descripti
   competitive: { label: 'Competitivo', description: 'Precio agresivo para competir', baseMargin: 0.25, color: 'sage', accent: 'bg-sage-500/15 text-sage-400 border-sage-500/30', darkAccent: '#6B9E72' },
   standard: { label: 'Estándar', description: 'Equilibrio entre beneficio y competitividad', baseMargin: 0.60, color: 'copper', accent: 'bg-copper-500/15 text-copper-400 border-copper-500/30', darkAccent: '#C77D3A' },
   premium: { label: 'Premium', description: 'Posicionamiento de calidad', baseMargin: 1.20, color: 'gold', accent: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', darkAccent: '#D4A843' },
-  luxury: { label: 'Lujo', description: 'Servicio exclusivo y acabado premium', baseMargin: 2.00, color: 'luxury', accent: 'bg-amber-300/15 text-amber-300 border-amber-300/30', darkAccent: '#E8C97A' },
+  luxury: { label: 'Lujo', description: 'Servicio exclusivo y acabado premium', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
 };
 
 export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; description: string; subtitle: string }> = {
