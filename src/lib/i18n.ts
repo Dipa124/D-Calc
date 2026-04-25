@@ -348,7 +348,6 @@ export interface Translations {
   ctaSubtitle: string;
   noRegistrationRequired: string;
   registerBenefits: string;
-  logisticsBusiness: string;
   designPerPiece: string;
   laborPerPiece: string;
   shareReport: string;
@@ -360,6 +359,71 @@ export interface Translations {
 
   // Settings
   theme: string;
+
+  // Post-processing
+  postProcessType: string;
+  tooltipPostProcessType: string;
+  postProcessRate: string;
+  tooltipPostProcessRate: string;
+
+  // Extra expenses
+  extraExpenses: string;
+  addExpense: string;
+  expenseDescription: string;
+  expensePrice: string;
+  removeExpense: string;
+
+  // Amortization
+  dailyUsageHours: string;
+  tooltipDailyUsage: string;
+  amortizationMonths: string;
+  tooltipAmortization: string;
+  monthlyMaintenance: string;
+  tooltipMonthlyMaintenance: string;
+  additionalInitialCost: string;
+  tooltipAdditionalCost: string;
+  bufferFactor: string;
+  tooltipBufferFactor: string;
+  commissionPct: string;
+  tooltipCommissionPct: string;
+  commissionFixed: string;
+  tooltipCommissionFixed: string;
+  priceRounding: string;
+  tooltipPriceRounding: string;
+  minimumOrder: string;
+  tooltipMinimumOrder: string;
+  amortizationPerHour: string;
+
+  // Price rounding options
+  noRounding: string;
+  round99: string;
+  round50: string;
+  round100: string;
+
+  // Post-process types
+  postProcessNone: string;
+  postProcessSupportRemoval: string;
+  postProcessSanding: string;
+  postProcessPainting: string;
+  postProcessAssembly: string;
+  postProcessGluing: string;
+  postProcessPolishing: string;
+  postProcessCustom: string;
+
+  // Export
+  downloadPDF: string;
+
+  // Cost display
+  costPerHourLabel: string;
+  extraExpensesLabel: string;
+
+  // Share
+  shareProducer: string;
+  shareInvoice: string;
+
+  // Toast messages
+  shareLinkCopied: string;
+  errorSharing: string;
 }
 
 const translations: Record<Locale, Translations> = {
@@ -610,8 +674,8 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: 'Bienvenido de nuevo',
     createYourAccount: 'Crea tu cuenta',
     orContinueWith: 'O continúa con',
-    logisticsBusiness: 'Logística y Negocio',
-    tooltipLogisticsBusiness: 'Impuestos, embalaje y envío del proyecto.',
+    logisticsBusiness: 'Logística y negocio',
+    tooltipLogisticsBusiness: 'Impuestos, embalaje, envío y amortización del proyecto.',
     pieceLaborRate: 'Tarifa mano obra (€/h)',
     tooltipPieceLaborRate: 'Coste horario de mano de obra para esta pieza (postprocesado + trabajo manual).',
     pieceDesignTime: 'Diseño (min)',
@@ -632,7 +696,6 @@ const translations: Record<Locale, Translations> = {
     ctaSubtitle: 'Gratuito, sin registro obligatorio. Empieza a calcular costes en segundos.',
     noRegistrationRequired: 'Sin registro obligatorio',
     registerBenefits: 'Regístrate para acceder al dashboard, guardar proyectos y más',
-    logisticsBusiness: 'Logística y negocio',
     designPerPiece: 'Diseño por pieza',
     laborPerPiece: 'Mano de obra por pieza',
     shareReport: 'Compartir informe',
@@ -642,6 +705,53 @@ const translations: Record<Locale, Translations> = {
     changeData: 'Cambiar datos',
     loginToCreateProfile: 'Inicia sesión para crear perfiles',
     theme: 'Tema',
+    postProcessType: 'Tipo de postprocesado',
+    tooltipPostProcessType: 'Selecciona el tipo de postprocesado. La tarifa se ajustará automáticamente.',
+    postProcessRate: 'Tarifa postproc. (€/h)',
+    tooltipPostProcessRate: 'Tarifa horaria para el trabajo de postprocesado.',
+    extraExpenses: 'Gastos extra',
+    addExpense: 'Añadir gasto',
+    expenseDescription: 'Descripción',
+    expensePrice: 'Precio',
+    removeExpense: 'Quitar',
+    dailyUsageHours: 'Uso diario (h)',
+    tooltipDailyUsage: 'Horas medias de uso diario de la impresora para calcular la amortización.',
+    amortizationMonths: 'Amortización (meses)',
+    tooltipAmortization: 'Periodo de amortización en meses para recuperar la inversión de la impresora.',
+    monthlyMaintenance: 'Mant. mensual (€)',
+    tooltipMonthlyMaintenance: 'Coste mensual estimado de mantenimiento de la impresora.',
+    additionalInitialCost: 'Inversión adicional (€)',
+    tooltipAdditionalCost: 'Inversión inicial adicional (herramientas, accesorios, etc.) a amortizar.',
+    bufferFactor: 'Factor buffer',
+    tooltipBufferFactor: 'Multiplicador para tiempos de inactividad inesperados (1.0 = sin buffer, 1.3 = 30% extra).',
+    commissionPct: 'Comisión (%)',
+    tooltipCommissionPct: 'Porcentaje de comisión de plataforma (Etsy, Amazon, etc.).',
+    commissionFixed: 'Comisión fija (€)',
+    tooltipCommissionFixed: 'Comisión fija por venta en la plataforma.',
+    priceRounding: 'Redondeo precio',
+    tooltipPriceRounding: 'Redondeo psicológico del precio final.',
+    minimumOrder: 'Pedido mínimo (€)',
+    tooltipMinimumOrder: 'Precio mínimo del pedido. Si el total es menor, se aplica este mínimo.',
+    amortizationPerHour: 'Amortización/h',
+    noRounding: 'Sin redondeo',
+    round99: '.99',
+    round50: '.50',
+    round100: 'Entero',
+    postProcessNone: 'Ninguno',
+    postProcessSupportRemoval: 'Retirar soportes',
+    postProcessSanding: 'Lijado',
+    postProcessPainting: 'Pintura',
+    postProcessAssembly: 'Montaje',
+    postProcessGluing: 'Pegado',
+    postProcessPolishing: 'Pulido',
+    postProcessCustom: 'Personalizado',
+    downloadPDF: 'Descargar PDF',
+    costPerHourLabel: 'Coste/h impresora',
+    extraExpensesLabel: 'Gastos extra',
+    shareProducer: 'Compartir reporte',
+    shareInvoice: 'Compartir factura',
+    shareLinkCopied: '¡Enlace copiado!',
+    errorSharing: 'Error al compartir',
   },
   en: {
     appName: 'D-Calc',
@@ -891,7 +1001,7 @@ const translations: Record<Locale, Translations> = {
     createYourAccount: 'Create your account',
     orContinueWith: 'Or continue with',
     logisticsBusiness: 'Logistics & Business',
-    tooltipLogisticsBusiness: 'Tax, packaging and shipping costs for the project.',
+    tooltipLogisticsBusiness: 'Tax, packaging, shipping and amortization costs for the project.',
     pieceLaborRate: 'Labor rate (€/h)',
     tooltipPieceLaborRate: 'Hourly labor cost for this piece (post-processing + manual work).',
     pieceDesignTime: 'Design (min)',
@@ -912,7 +1022,6 @@ const translations: Record<Locale, Translations> = {
     ctaSubtitle: 'Free, no registration required. Start calculating costs in seconds.',
     noRegistrationRequired: 'No registration required',
     registerBenefits: 'Sign up to access the dashboard, save projects, and more',
-    logisticsBusiness: 'Logistics & Business',
     designPerPiece: 'Design per piece',
     laborPerPiece: 'Labor per piece',
     shareReport: 'Share report',
@@ -922,6 +1031,53 @@ const translations: Record<Locale, Translations> = {
     changeData: 'Change data',
     loginToCreateProfile: 'Sign in to create profiles',
     theme: 'Theme',
+    postProcessType: 'Post-process type',
+    tooltipPostProcessType: 'Select the type of post-processing. The rate will auto-adjust.',
+    postProcessRate: 'Post-process rate (€/h)',
+    tooltipPostProcessRate: 'Hourly rate for post-processing work.',
+    extraExpenses: 'Extra expenses',
+    addExpense: 'Add expense',
+    expenseDescription: 'Description',
+    expensePrice: 'Price',
+    removeExpense: 'Remove',
+    dailyUsageHours: 'Daily usage (h)',
+    tooltipDailyUsage: 'Average daily printer usage hours for amortization calculation.',
+    amortizationMonths: 'Amortization (months)',
+    tooltipAmortization: 'Payback period in months to recover the printer investment.',
+    monthlyMaintenance: 'Monthly maint. (€)',
+    tooltipMonthlyMaintenance: 'Estimated monthly printer maintenance cost.',
+    additionalInitialCost: 'Additional investment (€)',
+    tooltipAdditionalCost: 'Additional initial investment (tools, accessories, etc.) to amortize.',
+    bufferFactor: 'Buffer factor',
+    tooltipBufferFactor: 'Multiplier for unexpected downtime (1.0 = no buffer, 1.3 = 30% extra).',
+    commissionPct: 'Commission (%)',
+    tooltipCommissionPct: 'Platform commission percentage (Etsy, Amazon, etc.).',
+    commissionFixed: 'Fixed commission (€)',
+    tooltipCommissionFixed: 'Fixed commission per sale on the platform.',
+    priceRounding: 'Price rounding',
+    tooltipPriceRounding: 'Psychological rounding of the final price.',
+    minimumOrder: 'Minimum order (€)',
+    tooltipMinimumOrder: 'Minimum order price. If total is lower, this minimum applies.',
+    amortizationPerHour: 'Amortization/h',
+    noRounding: 'No rounding',
+    round99: '.99',
+    round50: '.50',
+    round100: 'Whole',
+    postProcessNone: 'None',
+    postProcessSupportRemoval: 'Remove supports',
+    postProcessSanding: 'Sanding',
+    postProcessPainting: 'Painting',
+    postProcessAssembly: 'Assembly',
+    postProcessGluing: 'Gluing',
+    postProcessPolishing: 'Polishing',
+    postProcessCustom: 'Custom',
+    downloadPDF: 'Download PDF',
+    costPerHourLabel: 'Printer cost/h',
+    extraExpensesLabel: 'Extra expenses',
+    shareProducer: 'Share report',
+    shareInvoice: 'Share invoice',
+    shareLinkCopied: 'Share link copied!',
+    errorSharing: 'Failed to share report',
   },
   zh: {
     appName: 'D-Calc',
@@ -1170,8 +1326,8 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: '欢迎回来',
     createYourAccount: '创建您的账户',
     orContinueWith: '或继续使用',
-    logisticsBusiness: '物流与商务',
-    tooltipLogisticsBusiness: '项目的税费、包装和运输成本。',
+    logisticsBusiness: '物流与商业',
+    tooltipLogisticsBusiness: '项目的税费、包装、运输和摊销成本。',
     pieceLaborRate: '人工费率 (€/h)',
     tooltipPieceLaborRate: '此零件的每小时人工成本（后处理 + 手工工作）。',
     pieceDesignTime: '设计 (分钟)',
@@ -1192,7 +1348,6 @@ const translations: Record<Locale, Translations> = {
     ctaSubtitle: '免费，无需注册。几秒钟内开始计算成本。',
     noRegistrationRequired: '无需注册',
     registerBenefits: '注册以访问仪表板、保存项目等',
-    logisticsBusiness: '物流与商业',
     designPerPiece: '每件设计',
     laborPerPiece: '每件人工',
     shareReport: '分享报告',
@@ -1202,6 +1357,53 @@ const translations: Record<Locale, Translations> = {
     changeData: '更改数据',
     loginToCreateProfile: '登录以创建配置',
     theme: '主题',
+    postProcessType: '后处理类型',
+    tooltipPostProcessType: '选择后处理类型。费率将自动调整。',
+    postProcessRate: '后处理费率 (€/h)',
+    tooltipPostProcessRate: '后处理工作的每小时费率。',
+    extraExpenses: '额外费用',
+    addExpense: '添加费用',
+    expenseDescription: '描述',
+    expensePrice: '价格',
+    removeExpense: '删除',
+    dailyUsageHours: '日使用 (h)',
+    tooltipDailyUsage: '打印机日均使用小时数，用于摊销计算。',
+    amortizationMonths: '摊销 (月)',
+    tooltipAmortization: '回收打印机投资的摊销期（月）。',
+    monthlyMaintenance: '月维护 (€)',
+    tooltipMonthlyMaintenance: '打印机月度维护估算成本。',
+    additionalInitialCost: '额外投资 (€)',
+    tooltipAdditionalCost: '需要摊销的额外初始投资（工具、配件等）。',
+    bufferFactor: '缓冲因子',
+    tooltipBufferFactor: '意外停机时间的乘数（1.0 = 无缓冲，1.3 = 30%额外）。',
+    commissionPct: '佣金 (%)',
+    tooltipCommissionPct: '平台佣金百分比（Etsy、Amazon等）。',
+    commissionFixed: '固定佣金 (€)',
+    tooltipCommissionFixed: '平台上每笔销售的固定佣金。',
+    priceRounding: '价格取整',
+    tooltipPriceRounding: '最终价格的心理取整方式。',
+    minimumOrder: '最低订单 (€)',
+    tooltipMinimumOrder: '最低订单价格。如果总额更低，则适用此最低值。',
+    amortizationPerHour: '摊销/小时',
+    noRounding: '不取整',
+    round99: '.99',
+    round50: '.50',
+    round100: '整数',
+    postProcessNone: '无',
+    postProcessSupportRemoval: '去支撑',
+    postProcessSanding: '打磨',
+    postProcessPainting: '上色',
+    postProcessAssembly: '组装',
+    postProcessGluing: '粘合',
+    postProcessPolishing: '抛光',
+    postProcessCustom: '自定义',
+    downloadPDF: '下载 PDF',
+    costPerHourLabel: '打印机成本/小时',
+    extraExpensesLabel: '额外费用',
+    shareProducer: '分享报告',
+    shareInvoice: '分享发票',
+    shareLinkCopied: '分享链接已复制！',
+    errorSharing: '分享失败',
   },
   eu: {
     appName: 'D-Calc',
@@ -1450,8 +1652,8 @@ const translations: Record<Locale, Translations> = {
     welcomeBack: 'Ongi etorri berriro',
     createYourAccount: 'Sortu zure kontua',
     orContinueWith: 'Edo jarraitu honekin',
-    logisticsBusiness: 'Logistika eta Negozioa',
-    tooltipLogisticsBusiness: 'Zergak, paketatzea eta bidalketa proiektuarentzat.',
+    logisticsBusiness: 'Logistika eta negozioa',
+    tooltipLogisticsBusiness: 'Proiektuaren zergak, paketatzea, bidalketa eta amortizazioa.',
     pieceLaborRate: 'Lan tasa (€/h)',
     tooltipPieceLaborRate: 'Pieza honetako orduko lan kostua (post-prozesaketa + eskuzko lana).',
     pieceDesignTime: 'Diseinua (min)',
@@ -1472,7 +1674,6 @@ const translations: Record<Locale, Translations> = {
     ctaSubtitle: 'Doakoa, erregistrorik gabe. Segundotan hasi kostuak kalkulatzen.',
     noRegistrationRequired: 'Erregistrorik gabe',
     registerBenefits: 'Eman izena dashboardera sartu, proiektuak gorde eta gehiagorako',
-    logisticsBusiness: 'Logistika eta negozioa',
     designPerPiece: 'Diseinua piezako',
     laborPerPiece: 'Lana piezako',
     shareReport: 'Partekatu txostena',
@@ -1482,13 +1683,53 @@ const translations: Record<Locale, Translations> = {
     changeData: 'Aldatu datuak',
     loginToCreateProfile: 'Hasi saioa profilak sortzeko',
     theme: 'Itxura',
-    lightSanding: 'Leundu arina',
-    fullSanding: 'Leundu osoa',
-    primerPaint: 'Zubiloa eta pintura',
-    fullPaint: 'Pintura osoa',
-    vaporSmoothing: 'Lurrun-leuntzea',
-    epoxyCoating: 'Epoxi estalkia',
-    customFinish: 'Akabera pertsonalizatua',
+    postProcessType: 'Post-prozesu mota',
+    tooltipPostProcessType: 'Hautatu post-prozesu mota. Tarifa automatikoki doitzeko.',
+    postProcessRate: 'Post-prozesu tarifa (€/h)',
+    tooltipPostProcessRate: 'Post-prozesu lanaren orduko tarifa.',
+    extraExpenses: 'Gehigarri gastuak',
+    addExpense: 'Gehitu gastua',
+    expenseDescription: 'Deskribapena',
+    expensePrice: 'Prezioa',
+    removeExpense: 'Kendu',
+    dailyUsageHours: 'Eguneroko erabilera (h)',
+    tooltipDailyUsage: 'Inprimagailuaren eguneroko erabilera orduak amortizazioa kalkulatzeko.',
+    amortizationMonths: 'Amortizazioa (hilabete)',
+    tooltipAmortization: 'Inprimagailuaren inbertsioa berreskuratzeko amortizazio epea hilabetetan.',
+    monthlyMaintenance: 'Hilabeteko mantentze (€)',
+    tooltipMonthlyMaintenance: 'Inprimagailuaren hilabeteko mantentze kostua.',
+    additionalInitialCost: 'Inbertsio gehigarria (€)',
+    tooltipAdditionalCost: 'Amortizatzeko hasierako inbertsio gehigarria (tresnak, osagarriak).',
+    bufferFactor: 'Buffer faktorea',
+    tooltipBufferFactor: 'Ustekabeko geldialdietarako biderkatzailea (1.0 = bufferrik ez, 1.3 = %30 estra).',
+    commissionPct: 'Komisioa (%)',
+    tooltipCommissionPct: 'Plataformaren komisio ehunekoa (Etsy, Amazon, etab.).',
+    commissionFixed: 'Komisio finkoa (€)',
+    tooltipCommissionFixed: 'Salmentako komisio finkoa plataforma honetan.',
+    priceRounding: 'Prezio biribiltzea',
+    tooltipPriceRounding: 'Azken prezioaren biribiltze psikologikoa.',
+    minimumOrder: 'Eskaera minimoa (€)',
+    tooltipMinimumOrder: 'Eskaera gutxieneko prezioa. Totala txikiagoa bada, gutxieneko hau aplikatzen da.',
+    amortizationPerHour: 'Amortizazioa/h',
+    noRounding: 'Biribiltzerik ez',
+    round99: '.99',
+    round50: '.50',
+    round100: 'Osoa',
+    postProcessNone: 'Bat ere ez',
+    postProcessSupportRemoval: 'Euskarriak kendu',
+    postProcessSanding: 'Leuntze',
+    postProcessPainting: 'Margo',
+    postProcessAssembly: 'Muntaketa',
+    postProcessGluing: 'Itsatsi',
+    postProcessPolishing: 'Distiratu',
+    postProcessCustom: 'Pertsonalizatua',
+    downloadPDF: 'PDF deskargatu',
+    costPerHourLabel: 'Inprimagailu kostua/h',
+    extraExpensesLabel: 'Gehigarri gastuak',
+    shareProducer: 'Partekatu txostena',
+    shareInvoice: 'Partekatu faktura',
+    shareLinkCopied: 'Esteka kopiatua!',
+    errorSharing: 'Akatsa partekatzean',
   },
 };
 

@@ -1,4 +1,4 @@
-// D-Calc — Core FDM 3D Printing Price Calculation Engine (v6)
+// D-Calc — Core FDM 3D Printing Price Calculation Engine (v7)
 
 import type {
   SubPiece,
@@ -31,6 +31,32 @@ export function getSaleMultiplier(saleType: SaleType, customMultiplier: number):
   }
 }
 
+// ─── Calculate amortization cost per hour ───
+function calculateAmortizationPerHour(params: ProjectParams): number {
+  const totalInvestment = params.printerCost + params.additionalInitialCost;
+  const totalMonths = params.amortizationMonths || 30;
+  const dailyHours = params.dailyUsageHours || 8;
+  // Hours per month: daily hours × 30 days
+  const hoursPerMonth = dailyHours * 30;
+  // Monthly depreciation
+  const monthlyDepreciation = totalInvestment / totalMonths;
+  // Monthly maintenance
+  const monthlyMaint = params.monthlyMaintenanceCost || 0;
+  // Total monthly cost / hours per month
+  const costPerHour = hoursPerMonth > 0 ? (monthlyDepreciation + monthlyMaint) / hoursPerMonth : 0;
+  return costPerHour;
+}
+
+// ─── Apply price rounding ───
+function applyRounding(price: number, rounding: 'none' | '0.99' | '0.50' | '1.00'): number {
+  switch (rounding) {
+    case '0.99': return Math.floor(price) + 0.99;
+    case '0.50': return Math.round(price * 2) / 2;
+    case '1.00': return Math.ceil(price);
+    default: return price;
+  }
+}
+
 // ─── Sub-piece price calculation ───
 
 export function calculateSubPiecePrice(
@@ -42,16 +68,15 @@ export function calculateSubPiecePrice(
 ): SubPieceCostBreakdown {
   const totalPrintTimeHours = subPiece.printTimeHours + subPiece.printTimeMinutes / 60;
   const postProcessingTimeHours = subPiece.postProcessingTimeMinutes / 60;
-  const laborTimeHours = (subPiece.laborTimeMinutes || 0) / 60;
 
   // Material cost: weight in grams → kg, apply waste percentage
   const materialCost =
     (subPiece.printWeight * (1 + subPiece.wastePercentage / 100) / 1000) *
     subPiece.filamentCostPerKg;
 
-  // Printer depreciation per hour × print time
-  const printerDepreciation =
-    (params.printerCost / params.printerLifespanHours) * totalPrintTimeHours;
+  // Printer depreciation per hour × print time (using amortization model)
+  const amortizationPerHour = calculateAmortizationPerHour(params);
+  const printerDepreciation = amortizationPerHour * totalPrintTimeHours;
 
   // Electricity cost: watts → kW × hours × cost per kWh
   const electricityCost =
@@ -63,19 +88,21 @@ export function calculateSubPiecePrice(
   // Supervision cost: passive monitoring at supervision rate × 5% of print time
   const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.05;
 
+  // Post-processing cost: rate × time
+  const postProcessCost = subPiece.postProcessRatePerHour * postProcessingTimeHours;
+
   // Design cost per piece
   const designCost = (subPiece.designTimeMinutes / 60) * subPiece.designHourlyRate;
 
-  // Labor cost: post-processing + direct manual work at piece-specific labor rate
-  const laborCost = subPiece.laborCostPerHour * (postProcessingTimeHours + laborTimeHours);
+  // Finishing cost (per piece)
+  const finishingCost = subPiece.finishingCostPerPiece;
 
-  // Finishing cost (per piece, already includes quantity)
-  const finishingCost = subPiece.finishingCostPerPiece * subPiece.quantity;
+  // Extra expenses for this piece (sum of all extra expenses)
+  const extraExpensesCost = subPiece.extraExpenses.reduce((sum, e) => sum + e.price, 0);
 
-  // Failure cost: risk premium on core costs
-  const failureCost =
-    (materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + laborCost) *
-    (params.failureRate / 100);
+  // Failure cost: risk premium on core costs (with buffer factor)
+  const coreCosts = materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + postProcessCost;
+  const failureCost = coreCosts * (params.failureRate / 100) * params.bufferFactor;
 
   // Per-unit subtotal
   const subtotalPerUnit =
@@ -84,9 +111,10 @@ export function calculateSubPiecePrice(
     electricityCost +
     maintenanceCost +
     supervisionCost +
-    laborCost +
-    subPiece.finishingCostPerPiece +
+    postProcessCost +
+    finishingCost +
     designCost +
+    extraExpensesCost +
     failureCost;
 
   // Overhead per unit
@@ -122,10 +150,11 @@ export function calculateSubPiecePrice(
     electricityCost,
     maintenanceCost,
     supervisionCost,
-    laborCost,
+    postProcessCost,
     finishingCost,
-    failureCost,
     designCost,
+    extraExpensesCost,
+    failureCost,
     subtotalPerUnit,
     overheadPerUnit,
     baseCostPerUnit,
@@ -143,6 +172,9 @@ const ALL_TIERS: PricingTier[] = ['competitive', 'standard', 'premium', 'luxury'
 
 export function calculateProjectPrice(project: Project): ProjectPricingResult[] {
   const { params, saleType, customMultiplier } = project;
+
+  // Project-level extra expenses
+  const projectExtraExpenses = params.extraExpenses.reduce((sum, e) => sum + e.price, 0);
 
   return ALL_TIERS.map((tier) => {
     const tierConfig = PRICING_TIER_CONFIG[tier];
@@ -169,7 +201,25 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
     const totalTax = totalPriceBeforeTax * (params.taxRate / 100);
     const totalPackaging = params.packagingCostPerProject;
     const totalShipping = params.shippingCostPerProject;
-    const totalProjectPrice = totalPriceBeforeTax + totalTax + totalPackaging + totalShipping;
+    const totalExtraExpenses = projectExtraExpenses +
+      subPieceBreakdowns.reduce((sum, b) => sum + b.extraExpensesCost * b.quantity, 0);
+
+    // Commission calculation
+    const priceBeforeCommission = totalPriceBeforeTax + totalTax + totalPackaging + totalShipping + totalExtraExpenses;
+    const totalCommission = (priceBeforeCommission * params.commissionPercentage / 100) + params.commissionFixed;
+
+    let totalProjectPrice = priceBeforeCommission + totalCommission;
+
+    // Apply minimum order price
+    if (params.minimumOrderPrice > 0 && totalProjectPrice < params.minimumOrderPrice) {
+      totalProjectPrice = params.minimumOrderPrice;
+    }
+
+    // Apply price rounding
+    const roundedPrice = applyRounding(totalProjectPrice, params.priceRounding);
+    if (params.priceRounding !== 'none') {
+      totalProjectPrice = roundedPrice;
+    }
 
     return {
       tier,
@@ -184,7 +234,10 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
       totalTax,
       totalPackaging,
       totalShipping,
+      totalExtraExpenses,
+      totalCommission,
       totalProjectPrice,
+      roundedPrice,
     };
   });
 }

@@ -174,7 +174,7 @@ function generateProducerHtml(
         <tr><td>Depreciación impresora</td><td class="amount">${fc(b.printerDepreciation)}</td></tr>
         <tr><td>Electricidad</td><td class="amount">${fc(b.electricityCost)}</td></tr>
         <tr><td>Mantenimiento</td><td class="amount">${fc(b.maintenanceCost)}</td></tr>
-        <tr><td>Mano de obra</td><td class="amount">${fc(b.laborCost)}</td></tr>
+        <tr><td>Postprocesado + Supervisión</td><td class="amount">${fc(b.postProcessCost + b.supervisionCost)}</td></tr>
         <tr><td>Acabado</td><td class="amount">${fc(b.finishingCost)}</td></tr>
         <tr><td>Riesgo de fallo</td><td class="amount">${fc(b.failureCost)}</td></tr>
         <tr class="total-row"><td>Subtotal/unidad</td><td class="amount">${fc(b.subtotalPerUnit)}</td></tr>
