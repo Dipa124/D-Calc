@@ -143,3 +143,23 @@ When ready to add Supabase:
 - Dark → Light: Moon rotates 90° clockwise + fades out, Sun rotates in from -90° + fades in
 - Light → Dark: Sun rotates 90° + fades out, Moon rotates in from -90° + fades in
 - Applies `theme-transition` class to body during toggle
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix calculator TypeError, auth/registration, and data migration issues
+
+Work Log:
+- Fixed `params.extraExpenses.reduce()` TypeError in calculator.ts by adding `|| []` fallback
+- Fixed `subPiece.extraExpenses.reduce()` TypeError in calculator.ts by adding `|| []` fallback
+- Fixed `params.bufferFactor` undefined by adding `|| 1.0` fallback
+- Fixed registration page to use `signIn('credentials', {...})` from next-auth/react instead of raw `fetch('/api/auth/callback/credentials')` which doesn't work (NextAuth requires CSRF tokens)
+- Fixed auth.ts signIn page from '/' to '/registro'
+- Rewrote use-persisted-project.ts with migration logic that adds missing fields (extraExpenses, bufferFactor, etc.) to old project data from localStorage
+- Added safeExtraExpenses fallback in PieceCard component in calculadora page
+- Pushed all changes to GitHub (commit ca40b5f)
+
+Stage Summary:
+- Calculator no longer crashes with TypeError on old project data
+- Auth registration and login now work correctly using NextAuth's signIn() function
+- Old localStorage data is automatically migrated with proper defaults
+- Test user created successfully: test@test.com / test123456
