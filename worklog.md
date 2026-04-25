@@ -1,166 +1,95 @@
-# D-Calc Project Worklog
+# D-Calc Worklog
 
----
-Task ID: 1
-Agent: Main
-Task: Fix all i18n translations - homepage hardcoded English texts
+## Current Project Status
+- **Version**: V7 — Major Redesign
+- **Framework**: Next.js 16 with App Router, TypeScript, Tailwind CSS 4, Framer Motion
+- **Deployment**: Vercel (https://d-calc-taupe.vercel.app/) + GitHub (https://github.com/Dipa124/D-Calc)
+- **Database**: SQLite via Prisma (local dev), Supabase planned for production
+- **Auth**: NextAuth v4 with credentials provider
 
-Work Log:
-- Added 22+ new translation keys to Translations interface in i18n.ts
-- Added translations for all 4 languages (es, en, zh, eu)
-- Replaced all hardcoded English texts in homepage: hero badge, hero title, features title/subtitle, how it works title, CTA title/subtitle
-- Fixed "Theme" label in settings drawer (was hardcoded)
-- Added "sin registro obligatorio" messaging and register benefits text
-- Fixed footer text using existing i18n key
+## Completed in This Session
 
-Stage Summary:
-- All homepage texts now use i18n system
-- New keys: heroBadge, heroTitlePrefix, heroTitleHighlight, featuresTitle, featuresSubtitle, howItWorksTitle, ctaTitlePrefix, ctaTitleHighlight, ctaTitleSuffix, ctaSubtitle, noRegistrationRequired, registerBenefits, logisticsBusiness, designPerPiece, laborPerPiece, shareReport, shareReportDesc, accountSettings, deleteAccount, changeData, loginToCreateProfile, theme
+### Data Model Changes
+- Added `ExtraExpense` type: `{ id, description, price }` for non-hourly expenses
+- Added `PostProcessType` enum: none, supportRemoval, sanding, painting, assembly, gluing, polishing, custom
+- Removed `laborTimeMinutes` and `laborCostPerHour` from SubPiece
+- Added to SubPiece: `postProcessType`, `postProcessRatePerHour`, `extraExpenses[]`
+- Added to ProjectParams: `dailyUsageHours`, `amortizationMonths`, `monthlyMaintenanceCost`, `additionalInitialCost`, `bufferFactor`, `commissionPercentage`, `commissionFixed`, `priceRounding`, `minimumOrderPrice`, `extraExpenses[]`
+- Added to SubPieceCostBreakdown: `postProcessCost`, `extraExpensesCost`
+- Added to ProjectPricingResult: `totalExtraExpenses`, `totalCommission`, `roundedPrice`
+- Added `POST_PROCESS_DEFAULTS` with rates per post-process type
+- Added `generateExpenseId()` helper
 
----
-Task ID: 2
-Agent: Main
-Task: Fix homepage buttons and add registration info
+### Calculator Engine Changes
+- Replaced labor cost with post-process cost calculation
+- Added amortization calculation based on daily usage and months
+- Added buffer factor to failure cost calculation
+- Added commission calculation (percentage + fixed)
+- Added price rounding logic (none, .99, .50, whole)
+- Added minimum order price enforcement
+- Added project-level extra expenses
 
-Work Log:
-- Homepage "Calculate" button navigates to calculator page via onNavigate('calculator')
-- Homepage "Register" button navigates to auth page via onNavigate('auth')
-- Added CTA subtitle with "sin registro obligatorio" messaging
-- Added registerBenefits text explaining expanded possibilities
+### UI Changes
+- Homepage now starts as default page (was calculator)
+- Added "Sin registro obligatorio" text below hero buttons
+- Added language selector + theme toggle to homepage hero
+- Added currency selector, language, theme toggle to calculator header
+- Replaced "Mano de obra" with "Postprocesado" section in piece cards
+  - Type selector, time, rate per hour
+- Added "Gastos extra" dynamic list per piece (description + price)
+- Added amortization fields to Logistics & Business section
+  - Daily usage, amortization months, monthly maintenance
+  - Additional investment, buffer factor
+  - Commission % and fixed, price rounding, minimum order
+  - Read-only amortization per hour display
+- Changed reports from `window.open()` to iframe PDF download
+- Removed "Válido 30 días" from report footer
+- Professional UI overhaul: better visual hierarchy, section icons, gradient headers
+- Smooth theme transition using CSS class on body
 
-Stage Summary:
-- All homepage buttons work correctly
-- Clear messaging about no registration required + benefits of registering
+### i18n Updates
+- Added ~35 new translation keys to all 4 locales (es, en, zh, eu)
+- Keys for: postprocesado, gastos extra, amortization, commission, rounding, etc.
 
----
-Task ID: 3
-Agent: Main
-Task: Fix all tooltips to deploy to the RIGHT side
+## Unresolved Issues / Next Steps
+1. Vercel deployment environment variables need configuration (see guidance below)
+2. Supabase integration not yet implemented (auth + data persistence)
+3. Shareable report links need testing (API exists but may have edge cases)
+4. Some old component files in src/components/calculator/ reference old labor fields (not used by page.tsx)
+5. The "-taupe" suffix in Vercel URL comes from the project name in Vercel
+6. Z logo in browser tab replaced with D-Calc favicon
 
-Work Log:
-- Changed default `side` prop in InfoTooltip from 'top' to 'right'
-- This ensures consistent tooltip direction across the entire app
+## Vercel Environment Variables Guidance
 
-Stage Summary:
-- All tooltips now deploy to the right by default
+The following environment variables need to be set in Vercel (Settings → Environment Variables):
 
----
-Task ID: 4
-Agent: Main
-Task: Reorganize calculator parameters
+| Variable | Value | Required |
+|----------|-------|----------|
+| `DATABASE_URL` | `file:./db.sqlite` (for SQLite) or Supabase connection string | Yes |
+| `NEXTAUTH_SECRET` | Generate with: `openssl rand -base64 32` | Yes |
+| `NEXTAUTH_URL` | `https://d-calc-taupe.vercel.app` | Yes |
 
-Work Log:
-- Moved laborCostPerHour from ProjectParams to SubPiece (per-piece)
-- Moved designTimeMinutes from ProjectParams to SubPiece (per-piece)
-- Moved designHourlyRate from ProjectParams to SubPiece (per-piece)
-- Created new "Logística y negocio" section with taxRate, packaging, shipping
-- Updated calculator.ts to use per-piece labor rate and design cost
-- Updated SubPieceCostBreakdown with designCost field
-- Added labor rate and design time/rate fields to PieceCard
-- Removed these fields from ProjectParams and advanced settings
+### About Prisma
+Prisma is the ORM (Object-Relational Mapping) tool that D-Calc uses to interact with the database. It translates TypeScript code into database queries. Currently configured for SQLite (a simple file-based database), which works for local development. For production with Supabase, the connection string would change.
 
-Stage Summary:
-- Print params section: printer cost, lifespan, maintenance, power, electricity, supervision
-- Advanced print params: failure rate, overhead
-- Logistics & Business section: IVA, packaging, shipping
-- Per-piece fields: labor rate, design time, design rate
-- Calculator engine updated to use per-piece values
+### About NEXTAUTH_SECRET
+This is a secret key used to encrypt session tokens. Generate it by running this command in any terminal:
+```bash
+openssl rand -base64 32
+```
+Then paste the output as the value in Vercel.
 
----
-Task ID: 5
-Agent: Main
-Task: Printer profile creation only for logged-in users
+### About the "-taupe" URL
+The "taupe" in `d-calc-taupe.vercel.app` is automatically generated by Vercel when you create a project. To change it:
+1. Go to your Vercel project Settings → General
+2. Find "Project Name" and change it
+3. Or go to Settings → Domains to add a custom domain
 
-Work Log:
-- "Create Profile" button now disabled (opacity-50, pointer-events-none) for guests
-- Shows Lock icon instead of Plus for non-logged-in users
-- Tooltip explains they need to sign in
-
-Stage Summary:
-- Guest users cannot create printer profiles (button locked)
-- Visual indicator and tooltip explain the restriction
-
----
-Task ID: 6
-Agent: Main
-Task: Settings in calculator header + account settings
-
-Work Log:
-- Added currency, language, and theme selectors to calculator summary bar
-- Removed settings gear button and drawer from NavBar
-- Added user dropdown menu with Dashboard, Account Settings, and Sign Out
-- Compact inline selectors in summary bar for desktop/mobile
-
-Stage Summary:
-- Settings always visible in calculator header bar
-- Account settings only available for logged-in users via dropdown
-- Removed old settings drawer
-
----
-Task ID: 7
-Agent: Main
-Task: Improve calculator UI with more personality
-
-Work Log:
-- Added animated gradient borders on active tier card
-- Added sparkle effect on price display when it updates
-- Added decorative section dividers between sections
-- Added piece card color accent (left border from piece color)
-- Added micro-interactions (hover effects, scale, glow)
-- Better empty states with animated Package icon
-- Enhanced section headers with decorative icon badges
-- Price glow animation when total changes
-
-Stage Summary:
-- Calculator now has more visual personality and life
-- Multiple animation layers: sparkles, glow, gradient borders
-- Better visual hierarchy with decorative elements
-
----
-Task ID: 8
-Agent: Main
-Task: Smoother theme transition
-
-Work Log:
-- Removed blanket body transition rule that caused flash
-- Added targeted .theme-transition class
-- ThemeToggle adds class before switching, removes after 500ms
-- Only affects: background-color, color, border-color, box-shadow
-- Fixed invalid CSS nesting of @keyframes inside .dark
-
-Stage Summary:
-- Theme transition is now smooth (0.5s ease)
-- No more flash/jarring transition
-- Targeted CSS properties only
-
----
-Task ID: 9
-Agent: Main
-Task: Add shareable report links
-
-Work Log:
-- Added SharedReport model to Prisma schema
-- Created POST /api/reports endpoint to create shared reports
-- Created GET /api/reports/[id] endpoint returning standalone HTML
-- Shared report page looks like PDF preview (professional styling)
-- Added "Share Report" and "Share Invoice" buttons in calculator
-- URL is copied to clipboard on share
-- Toast notification with share URL
-
-Stage Summary:
-- Reports can be shared as view-only links
-- Standalone HTML page with clean report/invoice view
-- "Generated by D-Calc" footer on shared pages
-- Database stores shared report data
-
----
-Task ID: 10
-Agent: Main
-Task: Update GitHub
-
-Work Log:
-- Committed all changes with descriptive message
-- Pushed to https://github.com/Dipa124/D-Calc (main branch)
-
-Stage Summary:
-- GitHub repository updated with all V6 changes
+### Supabase Setup (Future)
+When ready to add Supabase:
+1. Create a Supabase project at supabase.com
+2. Get the connection string from Project Settings → Database → Connection string
+3. Update `DATABASE_URL` in Vercel to the Supabase connection string
+4. Update `prisma/schema.prisma` provider from `sqlite` to `postgresql`
+5. Run `bun run db:push` to create tables in Supabase
+6. The "direct connection string" in Supabase is for Prisma migrations; the pooled connection is for runtime queries
