@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: '/', // We handle login via modal, not a separate page
+    signIn: '/registro',
   },
   secret: process.env.NEXTAUTH_SECRET,
 }

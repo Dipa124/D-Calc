@@ -98,11 +98,11 @@ export function calculateSubPiecePrice(
   const finishingCost = subPiece.finishingCostPerPiece;
 
   // Extra expenses for this piece (sum of all extra expenses)
-  const extraExpensesCost = subPiece.extraExpenses.reduce((sum, e) => sum + e.price, 0);
+  const extraExpensesCost = (subPiece.extraExpenses || []).reduce((sum: number, e: { price: number }) => sum + e.price, 0);
 
   // Failure cost: risk premium on core costs (with buffer factor)
   const coreCosts = materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + postProcessCost;
-  const failureCost = coreCosts * (params.failureRate / 100) * params.bufferFactor;
+  const failureCost = coreCosts * (params.failureRate / 100) * (params.bufferFactor || 1.0);
 
   // Per-unit subtotal
   const subtotalPerUnit =
@@ -174,7 +174,7 @@ export function calculateProjectPrice(project: Project): ProjectPricingResult[] 
   const { params, saleType, customMultiplier } = project;
 
   // Project-level extra expenses
-  const projectExtraExpenses = params.extraExpenses.reduce((sum, e) => sum + e.price, 0);
+  const projectExtraExpenses = (params.extraExpenses || []).reduce((sum: number, e: { price: number }) => sum + e.price, 0);
 
   return ALL_TIERS.map((tier) => {
     const tierConfig = PRICING_TIER_CONFIG[tier];

@@ -130,7 +130,8 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
   subPiece: SubPiece; index: number; currency: CurrencyCode; onChange: (sp: SubPiece) => void; onRemove: () => void; t: Record<string, string>
 }) {
   const [expanded, setExpanded] = useState(true)
-  const update = (partial: Partial<SubPiece>) => onChange({ ...subPiece, ...partial })
+  const safeExtraExpenses = subPiece.extraExpenses || []
+  const update = (partial: Partial<SubPiece>) => onChange({ ...subPiece, extraExpenses: subPiece.extraExpenses || [], ...partial })
 
   const postProcessTypeLabels: Record<PostProcessType, string> = {
     none: t.postProcessNone || 'None',
@@ -204,15 +205,15 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
               <div className="border-t border-border/50 pt-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Coins className="w-3 h-3" /> {t.extraExpenses}</span>
-                  <button onClick={() => { const newExpense: ExtraExpense = { id: generateExpenseId(), description: '', price: 0 }; update({ extraExpenses: [...subPiece.extraExpenses, newExpense] }) }} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-copper/10 text-copper text-[10px] font-semibold hover:bg-copper/20 transition-colors"><Plus className="w-3 h-3" /> {t.addExpense}</button>
+                  <button onClick={() => { const newExpense: ExtraExpense = { id: generateExpenseId(), description: '', price: 0 }; update({ extraExpenses: [...safeExtraExpenses, newExpense] }) }} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-copper/10 text-copper text-[10px] font-semibold hover:bg-copper/20 transition-colors"><Plus className="w-3 h-3" /> {t.addExpense}</button>
                 </div>
-                {subPiece.extraExpenses.length > 0 && (
+                {safeExtraExpenses.length > 0 && (
                   <div className="space-y-2">
-                    {subPiece.extraExpenses.map((expense, idx) => (
+                    {safeExtraExpenses.map((expense, idx) => (
                       <div key={expense.id} className="flex items-center gap-2">
-                        <input type="text" value={expense.description} onChange={(e) => { const updated = [...subPiece.extraExpenses]; updated[idx] = { ...updated[idx], description: e.target.value }; update({ extraExpenses: updated }) }} placeholder={t.expenseDescription} className="flex-1 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper" />
-                        <input type="number" min={0} step={0.5} value={expense.price} onChange={(e) => { const updated = [...subPiece.extraExpenses]; updated[idx] = { ...updated[idx], price: parseFloat(e.target.value) || 0 }; update({ extraExpenses: updated }) }} placeholder={t.expensePrice} className="w-20 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
-                        <button onClick={() => update({ extraExpenses: subPiece.extraExpenses.filter(e => e.id !== expense.id) })} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 shrink-0"><Minus className="w-3 h-3 text-destructive/60" /></button>
+                        <input type="text" value={expense.description} onChange={(e) => { const updated = [...safeExtraExpenses]; updated[idx] = { ...updated[idx], description: e.target.value }; update({ extraExpenses: updated }) }} placeholder={t.expenseDescription} className="flex-1 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper" />
+                        <input type="number" min={0} step={0.5} value={expense.price} onChange={(e) => { const updated = [...safeExtraExpenses]; updated[idx] = { ...updated[idx], price: parseFloat(e.target.value) || 0 }; update({ extraExpenses: updated }) }} placeholder={t.expensePrice} className="w-20 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                        <button onClick={() => update({ extraExpenses: safeExtraExpenses.filter(e => e.id !== expense.id) })} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 shrink-0"><Minus className="w-3 h-3 text-destructive/60" /></button>
                       </div>
                     ))}
                   </div>
