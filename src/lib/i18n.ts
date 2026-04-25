@@ -9,13 +9,6 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   eu: 'Euskera',
 };
 
-export const LOCALE_FLAGS: Record<Locale, string> = {
-  es: '🇪🇸',
-  en: '🇬🇧',
-  zh: '🇨🇳',
-  eu: '🏴',
-};
-
 // Detect locale from browser
 export function detectLocale(): Locale {
   if (typeof navigator === 'undefined') return 'es';

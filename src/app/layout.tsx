@@ -4,6 +4,9 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
+import { I18nProvider } from "@/hooks/use-i18n";
+import { NavBar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -118,7 +121,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${spaceGrotesk.variable} ${dmSans.variable} font-sans antialiased bg-background text-foreground`}
+        className={`${spaceGrotesk.variable} ${dmSans.variable} font-sans antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         <ThemeProvider
           attribute="class"
@@ -127,10 +130,16 @@ export default function RootLayout({
           disableTransitionOnChange={false}
         >
           <AuthProvider>
-            {children}
-            <Toaster />
+            <I18nProvider>
+              <NavBar />
+              <main className="flex-1 flex flex-col">
+                {children}
+              </main>
+              <Footer />
+            </I18nProvider>
           </AuthProvider>
         </ThemeProvider>
+        <Toaster />
         <div className="noise-overlay" aria-hidden="true" />
       </body>
     </html>

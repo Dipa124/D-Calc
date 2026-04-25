@@ -93,3 +93,53 @@ When ready to add Supabase:
 4. Update `prisma/schema.prisma` provider from `sqlite` to `postgresql`
 5. Run `bun run db:push` to create tables in Supabase
 6. The "direct connection string" in Supabase is for Prisma migrations; the pooled connection is for runtime queries
+
+## V8 — Route-Based Architecture Refactor (Current Session)
+
+### Architecture Changes
+- Migrated from SPA-style `useState<AppPage>` client-side routing to Next.js App Router with separate route pages
+- Created dedicated route pages:
+  - `/home` — Landing page (HomePage content)
+  - `/calculadora` — Full calculator (CalculatorPage content, ~900 lines)
+  - `/registro` — Login/Register (AuthPage content)
+  - `/dashboard` — User dashboard (DashboardPage content)
+- Root `/` now redirects to `/home` using `router.replace`
+- NavBar and Footer moved to shared layout components in `/src/components/layout/`
+
+### Layout Components
+- Created `/src/components/layout/navbar.tsx` — Sticky header with:
+  - D-Calc logo with Next.js `useRouter` navigation
+  - Nav links using `usePathname()` for active state detection
+  - Language selector using `LOCALE_NAMES` only (NO flag emojis)
+  - Animated theme toggle with Framer Motion (moon rotates out, sun rotates in)
+  - User menu dropdown with `router.push()` for navigation
+  - Mobile hamburger menu
+- Created `/src/components/layout/footer.tsx` — Simple footer component
+
+### i18n Changes
+- Removed `LOCALE_FLAGS` export from `/src/lib/i18n.ts` (flag emojis looked bad as icons)
+- Updated all imports across project to use `LOCALE_NAMES` only
+- Language selectors now show language names only (e.g., "Español", "English", "中文", "Euskera")
+
+### Layout.tsx Updates
+- Added `I18nProvider` wrapping NavBar, main content, and Footer
+- Changed body to `min-h-screen flex flex-col` for sticky footer
+- Main content area uses `flex-1 flex flex-col`
+- NavBar + main + Footer wrapped in proper flex layout
+
+### Bug Fixes
+- Removed floating language/theme selectors from homepage hero section (now in navbar)
+- Removed visible gradient rectangle below hero buttons
+- Calculator summary bar now only shows currency selector (language/theme moved to navbar)
+
+### Navigation Mapping
+- `/home` → `onNavigate('home')` equivalent
+- `/calculadora` → `onNavigate('calculator')` equivalent
+- `/registro` → `onNavigate('auth')` equivalent
+- `/dashboard` → `onNavigate('dashboard')` equivalent
+
+### Theme Toggle Animation
+- Uses `AnimatePresence mode="wait"` with `motion.div`
+- Dark → Light: Moon rotates 90° clockwise + fades out, Sun rotates in from -90° + fades in
+- Light → Dark: Sun rotates 90° + fades out, Moon rotates in from -90° + fades in
+- Applies `theme-transition` class to body during toggle

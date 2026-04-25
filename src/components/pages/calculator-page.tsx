@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, FilamentType, FinishingType, PrinterProfile } from '@/lib/types'
 import { generateId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, getDefaultPrinterProfile, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, type CurrencyCode } from '@/lib/currency'
-import { LOCALE_NAMES, LOCALE_FLAGS, type Locale } from '@/lib/i18n'
+import { LOCALE_NAMES, type Locale } from '@/lib/i18n'
 import { useTheme } from 'next-themes'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
 import { ExportOptions } from '@/components/calculator/export-options'
@@ -522,7 +522,7 @@ export function CalculatorPage() {
                 className="compact-select"
               >
                 {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
-                  <option key={loc} value={loc}>{LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}</option>
+                  <option key={loc} value={loc}>{LOCALE_NAMES[loc]}</option>
                 ))}
               </select>
             </div>
@@ -585,7 +585,7 @@ export function CalculatorPage() {
               className="compact-select flex-1"
             >
               {(['es', 'en', 'zh', 'eu'] as Locale[]).map((loc) => (
-                <option key={loc} value={loc}>{LOCALE_FLAGS[loc]} {LOCALE_NAMES[loc]}</option>
+                <option key={loc} value={loc}>{LOCALE_NAMES[loc]}</option>
               ))}
             </select>
           </div>
