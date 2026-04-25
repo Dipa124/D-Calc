@@ -1,37 +1,43 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "CalcFDM — Calculadora de impresión 3D",
+  description:
+    "Calculadora profesional de costos para impresión 3D FDM. Estima precios de filament, tiempo, energía y mano de obra con precisión industrial.",
+  keywords: [
+    "impresión 3D",
+    "FDM",
+    "calculadora",
+    "costos",
+    "filamento",
+    "3D printing",
+    "price calculator",
+  ],
+  authors: [{ name: "CalcFDM" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "CalcFDM — Calculadora de impresión 3D",
+    description:
+      "Calculadora profesional de costos para impresión 3D FDM",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
   },
 };
 
@@ -41,12 +47,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${spaceGrotesk.variable} ${dmSans.variable} font-sans antialiased bg-background text-foreground`}
       >
-        {children}
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
+        {/* Subtle industrial noise texture overlay */}
+        <div className="noise-overlay" aria-hidden="true" />
       </body>
     </html>
   );
