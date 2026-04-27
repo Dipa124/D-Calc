@@ -121,13 +121,14 @@ export function SharePopup({ url, title, open, onClose }: SharePopupProps) {
             onClick={onClose}
           />
 
-          {/* Popup */}
+          {/* Popup - flex wrapper for reliable centering */}
+          <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 30 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md z-[90] glass-card-premium p-6"
+            className="w-full max-w-md mx-4 glass-card-premium p-6 pointer-events-auto"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
@@ -223,6 +224,7 @@ export function SharePopup({ url, title, open, onClose }: SharePopupProps) {
               Anyone with the link can view this report
             </p>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

@@ -7,8 +7,8 @@ import { useI18n } from '@/hooks/use-i18n'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
 import { useToast } from '@/hooks/use-toast'
-import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType, PostProcessType, PrinterProfile, ExtraExpense, MonthlyExpense } from '@/lib/types'
-import { generateId, generateExpenseId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, POST_PROCESS_DEFAULTS, printerProfileToParams } from '@/lib/types'
+import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, PostProcess, PrinterProfile, ExtraExpense, MonthlyExpense } from '@/lib/types'
+import { generateId, generateExpenseId, generatePostProcessId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, getCurrencySymbol, type CurrencyCode } from '@/lib/currency'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
 import { SharePopup } from '@/components/calculator/share-popup'
@@ -82,14 +82,50 @@ function SettingsField({ icon, label, tooltip, value, onChange, step = 1, min, m
 function BreakdownBar({ result, currency }: { result: ProjectPricingResult; currency: CurrencyCode }) {
   const total = result.totalProjectPrice || 1
   const segments = [
-    { pct: (result.totalMaterialCost / total) * 100, color: '#6B9E72', label: 'Material' },
-    { pct: ((result.totalBaseCost - result.totalMaterialCost) / total) * 100, color: '#4FC3F7', label: 'Operation' },
-    { pct: (result.totalProfit / total) * 100, color: '#C77D3A', label: 'Profit' },
-    { pct: (result.totalTax / total) * 100, color: '#D4A843', label: 'Tax' },
-    { pct: ((result.totalPackaging + result.totalShipping) / total) * 100, color: '#8A8690', label: 'Ship+Pkg' },
-    { pct: (result.totalExtraExpenses / total) * 100, color: '#9C27B0', label: 'Extra' },
+    { pct: (result.totalMaterialCost / total) * 100, color: '#6B9E72', label: 'Material', value: result.totalMaterialCost },
+    { pct: ((result.totalBaseCost - result.totalMaterialCost) / total) * 100, color: '#4FC3F7', label: 'Operation', value: result.totalBaseCost - result.totalMaterialCost },
+    { pct: (result.totalProfit / total) * 100, color: '#C77D3A', label: 'Profit', value: result.totalProfit },
+    { pct: (result.totalTax / total) * 100, color: '#D4A843', label: 'Tax', value: result.totalTax },
+    { pct: ((result.totalPackaging + result.totalShipping) / total) * 100, color: '#8A8690', label: 'Ship+Pkg', value: result.totalPackaging + result.totalShipping },
+    { pct: (result.totalExtraExpenses / total) * 100, color: '#9C27B0', label: 'Extra', value: result.totalExtraExpenses },
   ].filter(s => s.pct > 0.5)
-  return (<div className="breakdown-bar">{segments.map((seg, i) => (<div key={i} style={{ width: `${seg.pct}%`, backgroundColor: seg.color }} title={`${seg.label}: ${seg.pct.toFixed(1)}%`} />))}</div>)
+  return (
+    <div className="breakdown-bar">
+      {segments.map((seg, i) => (
+        <BreakdownSegment key={i} seg={seg} currency={currency} />
+      ))}
+    </div>
+  )
+}
+
+function BreakdownSegment({ seg, currency }: { seg: { pct: number; color: string; label: string; value: number }; currency: CurrencyCode }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <motion.div
+      style={{ width: `${seg.pct}%`, backgroundColor: seg.color }}
+      className="relative cursor-pointer"
+      whileHover={{ y: -4, scale: 1.02 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+    >
+      <AnimatePresence>
+        {hovered && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-popover border border-border text-[10px] font-mono shadow-md whitespace-nowrap z-10"
+          >
+            <span className="font-semibold text-foreground">{seg.label}</span>{' '}
+            <span className="text-muted-foreground">{seg.pct.toFixed(1)}%</span>{' '}
+            <span className="text-copper">{formatCurrency(seg.value, currency)}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
 }
 
 function LegendItem({ color, label, value, currency }: { color: string; label: string; value: number; currency: CurrencyCode }) {
@@ -106,8 +142,8 @@ function SubPieceBreakdown({ breakdown, currency, t }: { breakdown: SubPieceCost
     { label: t.materialWithWaste, value: breakdown.materialCost },
     { label: t.printerDepreciation, value: breakdown.printerDepreciation },
     { label: t.electricity, value: breakdown.electricityCost },
-    { label: t.maintenanceCost, value: breakdown.maintenanceCost },
-    { label: t.finishing, value: breakdown.finishingCost },
+    { label: t.supervisionCost || 'Supervision', value: breakdown.supervisionCost },
+    { label: t.postProcessCost || 'Post-process', value: breakdown.postProcessCost },
     { label: t.designCost, value: breakdown.designCost },
     { label: t.extraExpensesLabel || 'Extra', value: breakdown.extraExpensesCost },
     { label: t.failureRisk, value: breakdown.failureCost },
@@ -132,18 +168,8 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
 }) {
   const [expanded, setExpanded] = useState(true)
   const safeExtraExpenses = subPiece.extraExpenses || []
-  const update = (partial: Partial<SubPiece>) => onChange({ ...subPiece, extraExpenses: subPiece.extraExpenses || [], ...partial })
-
-  const postProcessTypeLabels: Record<PostProcessType, string> = {
-    none: t.postProcessNone || 'None',
-    supportRemoval: t.postProcessSupportRemoval || 'Remove supports',
-    sanding: t.postProcessSanding || 'Sanding',
-    painting: t.postProcessPainting || 'Painting',
-    assembly: t.postProcessAssembly || 'Assembly',
-    gluing: t.postProcessGluing || 'Gluing',
-    polishing: t.postProcessPolishing || 'Polishing',
-    custom: t.postProcessCustom || 'Custom',
-  }
+  const safePostProcesses = subPiece.postProcesses || []
+  const update = (partial: Partial<SubPiece>) => onChange({ ...subPiece, extraExpenses: subPiece.extraExpenses || [], postProcesses: subPiece.postProcesses || [], ...partial })
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card section-card overflow-hidden">
@@ -181,26 +207,34 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
                 <div><label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.waste} <InfoTooltip text={t.tooltipWaste} side="right" /></label><input type="number" min={0} max={100} step={1} value={subPiece.wastePercentage} onChange={(e) => update({ wastePercentage: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" /></div>
               </div>
 
-              {/* Row 3: Finishing + PostProcess */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.finishType} <InfoTooltip text={t.tooltipFinishingType} side="right" /></label>
-                  <select value={subPiece.finishingType} onChange={(e) => { const ft = e.target.value as FinishingType; update({ finishingType: ft, finishingCostPerPiece: FINISHING_DEFAULTS[ft].costPerPiece }) }} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
-                    {Object.entries(FINISHING_DEFAULTS).map(([key]) => <option key={key} value={key}>{key === 'none' ? t.noFinish : key === 'lightSanding' ? t.lightSanding : key === 'fullSanding' ? t.fullSanding : key === 'primerPaint' ? t.primerPaint : key === 'fullPaint' ? t.fullPaint : key === 'vaporSmoothing' ? t.vaporSmoothing : key === 'epoxyCoating' ? t.epoxyCoating : t.customFinish}</option>)}
-                  </select>
+              {/* Post-processing steps */}
+              <div className="border-t border-border/50 pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Paintbrush className="w-3 h-3" /> {t.postProcessing || 'Post-processing'}</span>
+                  <button onClick={() => { const newPP: PostProcess = { id: generatePostProcessId(), name: '', timeMinutes: 0, ratePerHour: 15 }; update({ postProcesses: [...safePostProcesses, newPP] }) }} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-copper/10 text-copper text-[10px] font-semibold hover:bg-copper/20 transition-colors"><Plus className="w-3 h-3" /> {t.addPostProcess || 'Add step'}</button>
                 </div>
-                <div>
-                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.postProcessType} <InfoTooltip text={t.tooltipPostProcessType} side="right" /></label>
-                  <select value={subPiece.postProcessType} onChange={(e) => { const pt = e.target.value as PostProcessType; update({ postProcessType: pt, postProcessRatePerHour: POST_PROCESS_DEFAULTS[pt].ratePerHour }) }} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
-                    {Object.entries(POST_PROCESS_DEFAULTS).map(([key]) => <option key={key} value={key}>{postProcessTypeLabels[key as PostProcessType] || key}</option>)}
-                  </select>
-                </div>
-                <div><label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.postProcessing} <InfoTooltip text={t.tooltipPostProcessing} side="right" /></label><input type="number" min={0} step={5} value={subPiece.postProcessingTimeMinutes} onChange={(e) => update({ postProcessingTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" /></div>
+                {safePostProcesses.length > 0 && (
+                  <div className="space-y-2">
+                    {safePostProcesses.map((pp, idx) => (
+                      <div key={pp.id} className="flex items-center gap-2">
+                        <input type="text" value={pp.name} onChange={(e) => { const updated = [...safePostProcesses]; updated[idx] = { ...updated[idx], name: e.target.value }; update({ postProcesses: updated }) }} placeholder={t.postProcessName || 'Step name'} className="flex-1 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper" />
+                        <div className="flex items-center gap-1">
+                          <input type="number" min={0} step={5} value={pp.timeMinutes} onChange={(e) => { const updated = [...safePostProcesses]; updated[idx] = { ...updated[idx], timeMinutes: parseFloat(e.target.value) || 0 }; update({ postProcesses: updated }) }} placeholder="min" className="w-16 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                          <span className="text-[10px] text-muted-foreground">min</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input type="number" min={0} step={1} value={pp.ratePerHour} onChange={(e) => { const updated = [...safePostProcesses]; updated[idx] = { ...updated[idx], ratePerHour: parseFloat(e.target.value) || 0 }; update({ postProcesses: updated }) }} placeholder="€/h" className="w-16 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                          <span className="text-[10px] text-muted-foreground">€/h</span>
+                        </div>
+                        <button onClick={() => update({ postProcesses: safePostProcesses.filter(p => p.id !== pp.id) })} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 shrink-0"><Minus className="w-3 h-3 text-destructive/60" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Row 4: PostProcess Rate + Design */}
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.postProcessRate} <InfoTooltip text={t.tooltipPostProcessRate} side="right" /></label><input type="number" min={0} step={1} value={subPiece.postProcessRatePerHour} onChange={(e) => update({ postProcessRatePerHour: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" /></div>
+              {/* Design */}
+              <div className="grid grid-cols-2 gap-2">
                 <div><label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.pieceDesignTime} <InfoTooltip text={t.tooltipPieceDesignTime} side="right" /></label><input type="number" min={0} step={5} value={subPiece.designTimeMinutes} onChange={(e) => update({ designTimeMinutes: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" /></div>
                 <div><label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-1">{t.pieceDesignRate} <InfoTooltip text={t.tooltipPieceDesignRate} side="right" /></label><input type="number" min={0} step={5} value={subPiece.designHourlyRate} onChange={(e) => update({ designHourlyRate: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" /></div>
               </div>
@@ -233,7 +267,7 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
 
 // ─── Printer Profile Modal ───
 function PrinterProfileModal({ profile, onClose, onSave, onDelete, t }: { profile: PrinterProfile | null; onClose: () => void; onSave: (p: PrinterProfile) => void; onDelete: (id: string) => void; t: Record<string, string> }) {
-  const [form, setForm] = useState<PrinterProfile>(profile || { id: '', name: '', model: '', price: 300, expectedLifespanYears: 2.5, powerConsumptionWatts: 200, failureRate: 5, maintenanceCostPerHour: 0.10, isDefault: false })
+  const [form, setForm] = useState<PrinterProfile>(profile || { id: '', name: '', model: '', price: 300, expectedLifespanYears: 2.5, powerConsumptionWatts: 200, failureRate: 5, isDefault: false })
   const updateForm = (partial: Partial<PrinterProfile>) => setForm(prev => ({ ...prev, ...partial }))
   return (
     <><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} /><motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed inset-x-4 top-[10%] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[70] glass-card-premium p-6 max-h-[80vh] overflow-y-auto">
@@ -247,10 +281,9 @@ function PrinterProfileModal({ profile, onClose, onSave, onDelete, t }: { profil
           <div><label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profilePrice || 'Price (\u20AC)'}</label><input type="number" min={0} step={10} value={form.price} onChange={e => updateForm({ price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" /></div>
           <div><label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileLifespanYears || 'Lifespan (years)'}</label><input type="number" min={0.5} step={0.5} value={form.expectedLifespanYears} onChange={e => updateForm({ expectedLifespanYears: parseFloat(e.target.value) || 1 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" /></div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div><label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profilePower || 'Power (W)'}</label><input type="number" min={0} step={10} value={form.powerConsumptionWatts} onChange={e => updateForm({ powerConsumptionWatts: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" /></div>
           <div><label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileFailureRate || 'Failure %'}</label><input type="number" min={0} max={100} step={0.5} value={form.failureRate} onChange={e => updateForm({ failureRate: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" /></div>
-          <div><label className="text-xs font-medium text-muted-foreground mb-1 block">{t.profileMaintenance || 'Maint. (\u20AC/h)'}</label><input type="number" min={0} step={0.01} value={form.maintenanceCostPerHour} onChange={e => updateForm({ maintenanceCostPerHour: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground font-mono" /></div>
         </div>
         <div className="flex items-center gap-2"><input type="checkbox" id="profileDefault" checked={form.isDefault} onChange={e => updateForm({ isDefault: e.target.checked })} className="rounded" /><label htmlFor="profileDefault" className="text-xs text-muted-foreground">{t.profileDefault || 'Set as default'}</label></div>
         <div className="flex gap-3 pt-2">
@@ -287,13 +320,13 @@ function generateReport(project: Project, result: ProjectPricingResult, t: Recor
     ${isInvoice ? '' : `<h2>${t.printParametersLabel}</h2><table><tr><th>${t.printerCost}</th><th>${t.printerLifespan}</th><th>${t.powerConsumption}</th><th>${t.electricityCost}</th></tr>
     <tr><td>${formatCurrency(project.params.printerCost, project.currency)}</td><td>${project.params.printerLifespanHours}h</td><td>${project.params.powerConsumptionWatts}W</td><td>${project.params.electricityCostPerKWh}\u20AC/kWh</td></tr></table>`}
     <h2>${t.subpieceBreakdown}</h2>
-    <table><tr><th>Pieza</th><th>Cant.</th>${isInvoice ? '' : `<th>${t.material}</th><th>${t.electricity}</th><th>${t.finishing}</th>`}<th>${t.totalPerUnit}</th><th>Total</th></tr>
-    ${result.subPieceBreakdowns.map(bd => `<tr><td>${bd.subPieceName}</td><td>${bd.quantity}</td>${isInvoice ? '' : `<td>${formatCurrency(bd.materialCost, project.currency)}</td><td>${formatCurrency(bd.electricityCost, project.currency)}</td><td>${formatCurrency(bd.finishingCost, project.currency)}</td>`}<td>${formatCurrency(bd.totalPerUnit, project.currency)}</td><td>${formatCurrency(bd.totalForQuantity, project.currency)}</td></tr>`).join('')}
+    <table><tr><th>Pieza</th><th>Cant.</th>${isInvoice ? '' : `<th>${t.material}</th><th>${t.electricity}</th><th>${t.postProcessCost || 'Post-process'}</th>`}<th>${t.totalPerUnit}</th><th>Total</th></tr>
+    ${result.subPieceBreakdowns.map(bd => `<tr><td>${bd.subPieceName}</td><td>${bd.quantity}</td>${isInvoice ? '' : `<td>${formatCurrency(bd.materialCost, project.currency)}</td><td>${formatCurrency(bd.electricityCost, project.currency)}</td><td>${formatCurrency(bd.postProcessCost, project.currency)}</td>`}<td>${formatCurrency(bd.totalPerUnit, project.currency)}</td><td>${formatCurrency(bd.totalForQuantity, project.currency)}</td></tr>`).join('')}
     </table>
     <h2>${t.projectSummary}</h2>
     <table>
     <tr><td>${t.totalBase}</td><td>${formatCurrency(result.totalBaseCost, project.currency)}</td></tr>
-    <tr><td>${t.totalProfitLabel}</td><td>${formatCurrency(result.totalProfit, project.currency)}</td></tr>
+    ${isInvoice ? '' : `<tr><td>${t.totalProfitLabel}</td><td>${formatCurrency(result.totalProfit, project.currency)}</td></tr>`}
     <tr><td>${t.priceBeforeTax}</td><td>${formatCurrency(result.totalPriceBeforeTax, project.currency)}</td></tr>
     <tr><td>${t.taxIncluded} (${project.params.taxRate}%)</td><td>${formatCurrency(result.totalTax, project.currency)}</td></tr>
     ${result.totalPackaging > 0 ? `<tr><td>${t.packaging}</td><td>${formatCurrency(result.totalPackaging, project.currency)}</td></tr>` : ''}
@@ -528,10 +561,8 @@ export default function CalculatorPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
               <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
-              <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.maintenance} tooltip={t.tooltipMaintenance} value={project.params.maintenanceCostPerHour} onChange={(v) => updateParams({ maintenanceCostPerHour: v })} step={0.01} />
               <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
               <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
-              <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={0.5} />
               <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
               <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.monthlyMaintenance} tooltip={t.tooltipMonthlyMaintenance} value={project.params.monthlyMaintenanceCost} onChange={(v) => updateParams({ monthlyMaintenanceCost: v })} step={1} />
             </div>
@@ -545,6 +576,7 @@ export default function CalculatorPage() {
               <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.taxRate} tooltip={t.tooltipTaxRate} value={project.params.taxRate} onChange={(v) => updateParams({ taxRate: v })} step={1} max={100} />
               <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
               <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
+              <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={0.5} />
             </div>
             {/* Monthly Expenses */}
             <div className="border-t border-border/50 pt-3">

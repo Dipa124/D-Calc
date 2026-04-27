@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { useI18n } from '@/hooks/use-i18n'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/calculator'
 import { PRICING_TIER_CONFIG } from '@/lib/types'
 import type { PricingTier, PrinterProfile } from '@/lib/types'
 import type { CurrencyCode } from '@/lib/currency'
 import {
   DollarSign, Layers, ShoppingBag, TrendingUp, BarChart3,
-  Trash2, FolderOpen, Printer, Code2, Settings, User, AlertCircle
+  Trash2, FolderOpen, Printer, User, AlertCircle, Settings
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -66,16 +66,12 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const { t } = useI18n()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [profiles, setProfiles] = useState<PrinterProfileInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
   const [currency] = useState<CurrencyCode>('EUR')
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'settings'>(
-    searchParams.get('tab') === 'settings' ? 'settings' : 'dashboard'
-  )
 
   const fc = (amount: number) => formatCurrency(amount, currency)
 
@@ -225,21 +221,6 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">{t.appSubtitle}</p>
           </div>
         </div>
-        {/* Section tabs */}
-        <div className="flex bg-secondary/50 rounded-lg p-1 sm:ml-auto">
-          <button
-            onClick={() => setActiveSection('dashboard')}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeSection === 'dashboard' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <span className="flex items-center gap-1.5"><BarChart3 className="w-3.5 h-3.5" />{t.dashboard}</span>
-          </button>
-          <button
-            onClick={() => setActiveSection('settings')}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeSection === 'settings' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <span className="flex items-center gap-1.5"><Settings className="w-3.5 h-3.5" />{t.accountSettings}</span>
-          </button>
-        </div>
       </div>
 
       {/* Fetch error banner */}
@@ -250,17 +231,15 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Dashboard Section */}
-      {activeSection === 'dashboard' && (
-        <>
-          {stats && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard icon={<DollarSign className="w-5 h-5" />} label={t.totalRevenue} value={fc(stats.totalRevenue)} bgClass="bg-copper/15" iconColor="text-copper" />
-              <StatCard icon={<Layers className="w-5 h-5" />} label={t.activeProjects} value={stats.totalProjects.toString()} bgClass="bg-sage/15" iconColor="text-sage" />
-              <StatCard icon={<ShoppingBag className="w-5 h-5" />} label={t.totalSales} value={stats.totalSales.toString()} bgClass="bg-gold/15" iconColor="text-gold" />
-              <StatCard icon={<TrendingUp className="w-5 h-5" />} label={t.avgPrice} value={fc(stats.avgPrice)} bgClass="bg-diamond/15" iconColor="text-diamond" />
-            </motion.div>
-          )}
+      {/* Dashboard Content */}
+      {stats && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={<DollarSign className="w-5 h-5" />} label={t.totalRevenue} value={fc(stats.totalRevenue)} bgClass="bg-copper/15" iconColor="text-copper" />
+          <StatCard icon={<Layers className="w-5 h-5" />} label={t.activeProjects} value={stats.totalProjects.toString()} bgClass="bg-sage/15" iconColor="text-sage" />
+          <StatCard icon={<ShoppingBag className="w-5 h-5" />} label={t.totalSales} value={stats.totalSales.toString()} bgClass="bg-gold/15" iconColor="text-gold" />
+          <StatCard icon={<TrendingUp className="w-5 h-5" />} label={t.avgPrice} value={fc(stats.avgPrice)} bgClass="bg-diamond/15" iconColor="text-diamond" />
+        </motion.div>
+      )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Projects */}
@@ -368,66 +347,6 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-        </>
-      )}
-
-      {/* Settings Section */}
-      {activeSection === 'settings' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          {/* Account Info */}
-          <div className="glass-card p-6">
-            <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase mb-5 flex items-center gap-2">
-              <User className="w-4 h-4 text-copper" /> {t.accountSettings}
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">{t.name}</label>
-                <p className="text-sm text-foreground font-medium mt-0.5">{session.user.name || '—'}</p>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider">{t.email}</label>
-                <p className="text-sm text-foreground font-medium mt-0.5">{session.user.email || '—'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Preferences */}
-          <div className="glass-card p-6">
-            <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase mb-5 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-sage" /> {t.theme}
-            </h2>
-            <p className="text-sm text-muted-foreground">{t.changeData}</p>
-            <p className="text-xs text-muted-foreground mt-2 italic">
-              More settings coming soon — currency defaults, notification preferences, and account management.
-            </p>
-          </div>
-
-          {/* Quick Stats Summary */}
-          <div className="glass-card p-6">
-            <h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase mb-4 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-gold" /> Quick Summary
-            </h2>
-            {stats ? (
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="font-display font-extrabold text-xl text-foreground">{stats.totalProjects}</div>
-                  <div className="text-[11px] text-muted-foreground">{t.activeProjects}</div>
-                </div>
-                <div>
-                  <div className="font-display font-extrabold text-xl text-foreground">{stats.totalSales}</div>
-                  <div className="text-[11px] text-muted-foreground">{t.totalSales}</div>
-                </div>
-                <div>
-                  <div className="font-display font-extrabold text-xl text-foreground">{fc(stats.totalRevenue)}</div>
-                  <div className="text-[11px] text-muted-foreground">{t.totalRevenue}</div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
-            )}
-          </div>
-        </motion.div>
-      )}
     </div>
     </div>
   )

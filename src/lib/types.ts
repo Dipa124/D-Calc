@@ -9,7 +9,6 @@ export type FilamentType =
 
 export type SaleType = 'wholesale' | 'retail' | 'custom' | 'rush';
 export type PricingTier = 'competitive' | 'standard' | 'premium' | 'luxury';
-export type FinishingType = 'none' | 'lightSanding' | 'fullSanding' | 'primerPaint' | 'fullPaint' | 'vaporSmoothing' | 'epoxyCoating' | 'custom';
 export type PostProcessType = 'none' | 'supportRemoval' | 'sanding' | 'painting' | 'assembly' | 'gluing' | 'polishing' | 'custom';
 
 // ─── App Page ───
@@ -29,6 +28,14 @@ export interface MonthlyExpense {
   amount: number;
 }
 
+// ─── Post-Process Step (multiple per piece) ───
+export interface PostProcess {
+  id: string;
+  name: string;             // e.g. "Sanding", "Painting", "Remove imperfections"
+  timeMinutes: number;      // Time in minutes for this step
+  ratePerHour: number;      // Rate per hour for this step
+}
+
 // ─── Printer Profile (user-created) ───
 export interface PrinterProfile {
   id: string;
@@ -38,7 +45,6 @@ export interface PrinterProfile {
   expectedLifespanYears: number; // Years before replacement (converted to hours internally)
   powerConsumptionWatts: number; // Average power consumption during printing
   failureRate: number;           // Default failure rate percentage
-  maintenanceCostPerHour: number; // Maintenance cost per hour
   isDefault?: boolean;           // If this is the user's default profile
 }
 
@@ -55,13 +61,8 @@ export interface SubPiece {
   printTimeHours: number;
   printTimeMinutes: number;
   quantity: number;
-  finishingType: FinishingType;
-  finishingCostPerPiece: number;
-  customFinishingDescription: string;
-  // Post-processing (replaces old labor)
-  postProcessType: PostProcessType;
-  postProcessingTimeMinutes: number;
-  postProcessRatePerHour: number;     // Rate per hour for post-processing work
+  // Post-processing (multiple steps per piece)
+  postProcesses: PostProcess[];
   // Design (per-piece)
   designTimeMinutes: number;
   designHourlyRate: number;
@@ -74,12 +75,11 @@ export interface ProjectParams {
   printerProfileId: string;       // Printer profile ID or 'custom'
   printerCost: number;
   printerLifespanHours: number;
-  maintenanceCostPerHour: number;
   powerConsumptionWatts: number;
   electricityCostPerKWh: number;
-  supervisionCostPerHour: number; // Rate for passive print supervision (low — ~5% of print time)
   failureRate: number;
   // Logistics & Business
+  supervisionCostPerHour: number; // Rate for passive print supervision (low — ~5% of print time)
   taxRate: number;
   packagingCostPerProject: number;
   shippingCostPerProject: number;
@@ -121,10 +121,8 @@ export interface SubPieceCostBreakdown {
   materialCost: number;
   printerDepreciation: number;
   electricityCost: number;
-  maintenanceCost: number;
   supervisionCost: number;
   postProcessCost: number;
-  finishingCost: number;
   designCost: number;
   extraExpensesCost: number;
   failureCost: number;
@@ -191,18 +189,6 @@ export const PRICING_TIER_CONFIG: Record<PricingTier, { label: string; descripti
   luxury: { label: 'luxury', description: 'Exclusive service', baseMargin: 2.00, color: 'diamond', accent: 'bg-diamond/15 text-diamond border-diamond/30', darkAccent: '#4FC3F7' },
 };
 
-// ─── Finishing defaults ───
-export const FINISHING_DEFAULTS: Record<FinishingType, { costPerPiece: number; subtitle: string }> = {
-  none: { costPerPiece: 0, subtitle: 'Free' },
-  lightSanding: { costPerPiece: 2, subtitle: '~2€/pc' },
-  fullSanding: { costPerPiece: 5, subtitle: '~5€/pc' },
-  primerPaint: { costPerPiece: 8, subtitle: '~8€/pc' },
-  fullPaint: { costPerPiece: 15, subtitle: '~15€/pc' },
-  vaporSmoothing: { costPerPiece: 6, subtitle: '~6€/pc' },
-  epoxyCoating: { costPerPiece: 10, subtitle: '~10€/pc' },
-  custom: { costPerPiece: 0, subtitle: 'Custom' },
-};
-
 // ─── Post-processing type defaults ───
 export const POST_PROCESS_DEFAULTS: Record<PostProcessType, { ratePerHour: number; description: string }> = {
   none: { ratePerHour: 0, description: 'No post-processing' },
@@ -220,6 +206,7 @@ export function generateId(): string { return `sp_${Date.now()}_${++_idCounter}`
 export function generateProjectId(): string { return `proj_${Date.now()}_${++_idCounter}`; }
 export function generateProfileId(): string { return `prf_${Date.now()}_${++_idCounter}`; }
 export function generateExpenseId(): string { return `exp_${Date.now()}_${++_idCounter}`; }
+export function generatePostProcessId(): string { return `pp_${Date.now()}_${++_idCounter}`; }
 
 export function getDefaultSubPiece(): SubPiece {
   return {
@@ -227,9 +214,8 @@ export function getDefaultSubPiece(): SubPiece {
     filamentType: 'PLA', customFilamentName: '', filamentCostPerKg: 20,
     printWeight: 50, wastePercentage: 8,
     printTimeHours: 3, printTimeMinutes: 30,
-    quantity: 1, finishingType: 'none', finishingCostPerPiece: 0,
-    customFinishingDescription: '',
-    postProcessType: 'none', postProcessingTimeMinutes: 0, postProcessRatePerHour: 15,
+    quantity: 1,
+    postProcesses: [],
     designTimeMinutes: 0, designHourlyRate: 25,
     extraExpenses: [],
   };
@@ -238,10 +224,10 @@ export function getDefaultSubPiece(): SubPiece {
 export function getDefaultProjectParams(): ProjectParams {
   return {
     printerProfileId: 'custom',
-    printerCost: 300, printerLifespanHours: 5000, maintenanceCostPerHour: 0.10,
+    printerCost: 300, printerLifespanHours: 5000,
     powerConsumptionWatts: 200, electricityCostPerKWh: 0.15,
-    supervisionCostPerHour: 5,
     failureRate: 5,
+    supervisionCostPerHour: 5,
     taxRate: 21, packagingCostPerProject: 0.50, shippingCostPerProject: 0,
     dailyUsageHours: 8, amortizationMonths: 30,
     monthlyMaintenanceCost: 0, additionalInitialCost: 0,
@@ -270,7 +256,6 @@ export function printerProfileToParams(profile: PrinterProfile): Partial<Project
     printerProfileId: profile.id,
     printerCost: profile.price,
     printerLifespanHours: estimatedHours,
-    maintenanceCostPerHour: profile.maintenanceCostPerHour,
     powerConsumptionWatts: profile.powerConsumptionWatts,
     failureRate: profile.failureRate,
   };
@@ -286,7 +271,6 @@ export function getDefaultPrinterProfile(): PrinterProfile {
     expectedLifespanYears: 2.5,
     powerConsumptionWatts: 200,
     failureRate: 5,
-    maintenanceCostPerHour: 0.10,
     isDefault: true,
   };
 }

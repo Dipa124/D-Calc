@@ -40,21 +40,36 @@ function migrateProject(parsed: unknown): Project {
 
   // Ensure subPieces have all new fields
   const defaultSubPiece = getDefaultProject().subPieces[0];
-  const subPieces: SubPiece[] = (proj.subPieces || []).map((sp: Partial<SubPiece>) => ({
-    ...defaultSubPiece,
-    ...sp,
-    extraExpenses: (sp as SubPiece).extraExpenses || [],
-    postProcessType: (sp as SubPiece).postProcessType ?? 'none',
-    postProcessingTimeMinutes: (sp as SubPiece).postProcessingTimeMinutes ?? 0,
-    postProcessRatePerHour: (sp as SubPiece).postProcessRatePerHour ?? 15,
-    designTimeMinutes: (sp as SubPiece).designTimeMinutes ?? 0,
-    designHourlyRate: (sp as SubPiece).designHourlyRate ?? 25,
-    finishingType: (sp as SubPiece).finishingType ?? 'none',
-    finishingCostPerPiece: (sp as SubPiece).finishingCostPerPiece ?? 0,
-    customFinishingDescription: (sp as SubPiece).customFinishingDescription ?? '',
-    customFilamentName: (sp as SubPiece).customFilamentName ?? '',
-    color: (sp as SubPiece).color ?? '#C77D3A',
-  }));
+  const subPieces: SubPiece[] = (proj.subPieces || []).map((sp: Partial<SubPiece>) => {
+    // Migrate old postProcessType to new postProcesses array
+    const oldSp = sp as SubPiece & { 
+      postProcessType?: string; 
+      postProcessingTimeMinutes?: number; 
+      postProcessRatePerHour?: number;
+      finishingType?: string;
+      finishingCostPerPiece?: number;
+      customFinishingDescription?: string;
+    };
+    let postProcesses = (sp as SubPiece).postProcesses || [];
+    if (postProcesses.length === 0 && oldSp.postProcessType && oldSp.postProcessType !== 'none' && oldSp.postProcessingTimeMinutes && oldSp.postProcessingTimeMinutes > 0) {
+      postProcesses = [{
+        id: `pp_migrated_${Date.now()}`,
+        name: oldSp.postProcessType,
+        timeMinutes: oldSp.postProcessingTimeMinutes || 0,
+        ratePerHour: oldSp.postProcessRatePerHour || 15,
+      }];
+    }
+    return {
+      ...defaultSubPiece,
+      ...sp,
+      postProcesses,
+      extraExpenses: (sp as SubPiece).extraExpenses || [],
+      designTimeMinutes: (sp as SubPiece).designTimeMinutes ?? 0,
+      designHourlyRate: (sp as SubPiece).designHourlyRate ?? 25,
+      customFilamentName: (sp as SubPiece).customFilamentName ?? '',
+      color: (sp as SubPiece).color ?? '#C77D3A',
+    };
+  });
 
   return {
     ...getDefaultProject(),

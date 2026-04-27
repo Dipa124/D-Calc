@@ -98,10 +98,10 @@ function UserMenu() {
               <BarChart3 className="w-4 h-4 text-copper" />{t.dashboard}
             </button>
             <button
-              onClick={() => { router.push('/dashboard?tab=settings'); setOpen(false) }}
+              onClick={() => { router.push('/settings'); setOpen(false) }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary/80 transition-colors"
             >
-              <Settings className="w-4 h-4 text-muted-foreground" />{t.accountSettings}
+              <Settings className="w-4 h-4 text-muted-foreground" />{t.accountSettings || 'Settings'}
             </button>
             <div className="h-px bg-border/50 my-1" />
             <button
@@ -130,6 +130,7 @@ const ROUTE_MAP: Record<string, string> = {
   '/calculator': 'calculator',
   '/register': 'auth',
   '/dashboard': 'dashboard',
+  '/settings': 'settings',
 }
 
 // ═══════════════════════════════════════════
@@ -147,7 +148,10 @@ export function NavBar() {
   const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     { path: '/home', label: t.navHome || 'Home', icon: <HomeIcon className="w-4 h-4" /> },
     { path: '/calculator', label: t.navCalculator || 'Calculator', icon: <Calculator className="w-4 h-4" /> },
-    ...(session?.user ? [{ path: '/dashboard', label: t.navDashboard || 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }] : []),
+    ...(session?.user ? [
+      { path: '/dashboard', label: t.navDashboard || 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
+      { path: '/settings', label: t.accountSettings || 'Settings', icon: <Settings className="w-4 h-4" /> },
+    ] : []),
   ]
 
   return (
@@ -169,14 +173,6 @@ export function NavBar() {
             </h1>
           </div>
         </motion.button>
-
-        {/* Hamburger menu button - always visible */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors"
-        >
-          <Menu className="w-4 h-4 text-muted-foreground" />
-        </button>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Language selector — names only, no flags */}
@@ -205,6 +201,14 @@ export function NavBar() {
           ) : (
             <UserMenu />
           )}
+
+          {/* Hamburger menu button - always visible, top right */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors"
+          >
+            <Menu className="w-4 h-4 text-muted-foreground" />
+          </button>
 
         </div>
       </div>

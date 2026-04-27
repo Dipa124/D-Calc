@@ -67,7 +67,6 @@ export function calculateSubPiecePrice(
   profitMargin: number,
 ): SubPieceCostBreakdown {
   const totalPrintTimeHours = subPiece.printTimeHours + subPiece.printTimeMinutes / 60;
-  const postProcessingTimeHours = subPiece.postProcessingTimeMinutes / 60;
 
   // Material cost: weight in grams → kg, apply waste percentage
   const materialCost =
@@ -82,26 +81,22 @@ export function calculateSubPiecePrice(
   const electricityCost =
     (params.powerConsumptionWatts / 1000) * totalPrintTimeHours * params.electricityCostPerKWh;
 
-  // Maintenance cost per hour × print time
-  const maintenanceCost = params.maintenanceCostPerHour * totalPrintTimeHours;
-
   // Supervision cost: passive monitoring at supervision rate × 5% of print time
   const supervisionCost = params.supervisionCostPerHour * totalPrintTimeHours * 0.05;
 
-  // Post-processing cost: rate × time
-  const postProcessCost = subPiece.postProcessRatePerHour * postProcessingTimeHours;
+  // Post-processing cost: sum of all post-process steps (rate × time for each)
+  const postProcessCost = (subPiece.postProcesses || []).reduce(
+    (sum: number, pp: { ratePerHour: number; timeMinutes: number }) => sum + (pp.ratePerHour * pp.timeMinutes / 60), 0
+  );
 
   // Design cost per piece
   const designCost = (subPiece.designTimeMinutes / 60) * subPiece.designHourlyRate;
-
-  // Finishing cost (per piece)
-  const finishingCost = subPiece.finishingCostPerPiece;
 
   // Extra expenses for this piece (sum of all extra expenses)
   const extraExpensesCost = (subPiece.extraExpenses || []).reduce((sum: number, e: { price: number }) => sum + e.price, 0);
 
   // Failure cost: risk premium on core costs (with buffer factor)
-  const coreCosts = materialCost + printerDepreciation + electricityCost + maintenanceCost + supervisionCost + postProcessCost;
+  const coreCosts = materialCost + printerDepreciation + electricityCost + supervisionCost + postProcessCost;
   const failureCost = coreCosts * (params.failureRate / 100) * (params.bufferFactor || 1.0);
 
   // Per-unit subtotal
@@ -109,10 +104,8 @@ export function calculateSubPiecePrice(
     materialCost +
     printerDepreciation +
     electricityCost +
-    maintenanceCost +
     supervisionCost +
     postProcessCost +
-    finishingCost +
     designCost +
     extraExpensesCost +
     failureCost;
@@ -153,10 +146,8 @@ export function calculateSubPiecePrice(
     materialCost,
     printerDepreciation,
     electricityCost,
-    maintenanceCost,
     supervisionCost,
     postProcessCost,
-    finishingCost,
     designCost,
     extraExpensesCost,
     failureCost,
