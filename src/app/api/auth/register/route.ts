@@ -7,9 +7,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { email, password, name } = body
 
-    if (!email || !password) {
+    if (!name || !name.trim()) {
       return NextResponse.json(
-        { error: 'Email y contraseña son obligatorios' },
+        { error: 'El nombre es obligatorio' },
+        { status: 400 }
+      )
+    }
+
+    if (!email || !email.trim()) {
+      return NextResponse.json(
+        { error: 'El email es obligatorio' },
+        { status: 400 }
+      )
+    }
+
+    if (!password) {
+      return NextResponse.json(
+        { error: 'La contraseña es obligatoria' },
         { status: 400 }
       )
     }

@@ -423,6 +423,13 @@ export default function CalculatorPage() {
 
   return (
     <motion.main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6 relative z-10" variants={containerVariants} initial="hidden" animate="visible">
+      {/* Animated mesh gradient background */}
+      <div className="mesh-gradient-bg opacity-30">
+        <div className="mesh-blob-1" />
+        <div className="mesh-blob-2" />
+        <div className="mesh-blob-3" />
+        <div className="mesh-blob-4" />
+      </div>
       {/* Summary Bar — currency only (language/theme in navbar) */}
       <div className="glass-card border border-border/30 rounded-xl p-3 mb-6">
         <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto">
@@ -501,23 +508,23 @@ export default function CalculatorPage() {
           </motion.section>
 
           {/* Printer Profile */}
-          <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
-            <div className="flex items-center gap-2"><Printer className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2><InfoTooltip text={t.tooltipPrinterModel} side="right" /></div>
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><Printer className="w-3.5 h-3.5" /> {t.printerModel}</label>
-                <select value={project.params.printerProfileId} onChange={(e) => handlePrinterProfileSelect(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
-                  <option value="custom">{t.printerDefaults}</option>
-                  {printerProfiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.model})</option>)}
-                </select>
+          {session?.user && (
+            <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">
+              <div className="flex items-center gap-2"><Printer className="w-4 h-4 text-copper" /><h2 className="font-display font-bold text-sm text-foreground tracking-wide uppercase">{t.printParameters}</h2><InfoTooltip text={t.tooltipPrinterModel} side="right" /></div>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"><Printer className="w-3.5 h-3.5" /> {t.printerModel}</label>
+                  <select value={project.params.printerProfileId} onChange={(e) => handlePrinterProfileSelect(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-copper">
+                    <option value="custom">{t.printerDefaults}</option>
+                    {printerProfiles.map(p => <option key={p.id} value={p.id}>{p.name} ({p.model})</option>)}
+                  </select>
+                </div>
+                <div className="relative">
+                  <motion.button onClick={() => { setEditingProfile(null); setShowProfileModal(true) }} className="px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors bg-copper/10 border-copper/30 text-copper hover:bg-copper/20 cursor-pointer" whileTap={{ scale: 0.97 }}>
+                    <Plus className="w-3.5 h-3.5" /> {t.createProfile || 'New Profile'}
+                  </motion.button>
+                </div>
               </div>
-              <div className="relative">
-                <motion.button onClick={() => { if (session?.user) { setEditingProfile(null); setShowProfileModal(true) } }} className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${session?.user ? 'bg-copper/10 border-copper/30 text-copper hover:bg-copper/20 cursor-pointer' : 'bg-secondary/50 border-border text-muted-foreground opacity-50 pointer-events-none cursor-not-allowed'}`} whileTap={session?.user ? { scale: 0.97 } : undefined}>
-                  {session?.user ? <Plus className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />} {t.createProfile || 'New Profile'}
-                </motion.button>
-                {!session?.user && <InfoTooltip text={t.signInToCreateProfiles} side="top" />}
-              </div>
-            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <SettingsField icon={<Printer className="w-3.5 h-3.5" />} label={t.printerCost} tooltip={t.tooltipPrinterCost} value={project.params.printerCost} onChange={(v) => updateParams({ printerCost: v })} step={10} />
               <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.printerLifespan} tooltip={t.tooltipLifespan} value={project.params.printerLifespanHours} onChange={(v) => updateParams({ printerLifespanHours: v })} step={500} min={100} />
@@ -528,7 +535,8 @@ export default function CalculatorPage() {
               <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
               <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.monthlyMaintenance} tooltip={t.tooltipMonthlyMaintenance} value={project.params.monthlyMaintenanceCost} onChange={(v) => updateParams({ monthlyMaintenanceCost: v })} step={1} />
             </div>
-          </motion.section>
+            </motion.section>
+          )}
 
           {/* Logistics & Business */}
           <motion.section variants={sectionVariants} className="glass-card section-card p-4 space-y-4">

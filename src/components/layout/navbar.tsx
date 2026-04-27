@@ -98,14 +98,21 @@ function UserMenu() {
               <BarChart3 className="w-4 h-4 text-copper" />{t.dashboard}
             </button>
             <button
-              onClick={() => { router.push('/dashboard'); setOpen(false) }}
+              onClick={() => { router.push('/dashboard?tab=settings'); setOpen(false) }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary/80 transition-colors"
             >
               <Settings className="w-4 h-4 text-muted-foreground" />{t.accountSettings}
             </button>
             <div className="h-px bg-border/50 my-1" />
             <button
-              onClick={() => { signOut(); setOpen(false) }}
+              onClick={async () => {
+                setOpen(false)
+                try {
+                  await signOut({ callbackUrl: '/home' })
+                } catch {
+                  router.push('/home')
+                }
+              }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
             >
               <LogIn className="w-4 h-4" />{t.logout}
@@ -163,25 +170,13 @@ export function NavBar() {
           </div>
         </motion.button>
 
-        <nav className="hidden md:flex flex-1 items-center justify-center gap-1">
-          {navItems.map(({ path, label, icon }) => (
-            <motion.button
-              key={path}
-              onClick={() => router.push(path)}
-              className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${currentPage === ROUTE_MAP[path] ? 'text-copper bg-copper/10' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}
-              whileTap={{ scale: 0.97 }}
-            >
-              {icon}{label}
-              {currentPage === ROUTE_MAP[path] && (
-                <motion.div
-                  layoutId="nav-indicator"
-                  className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-copper to-gold"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                />
-              )}
-            </motion.button>
-          ))}
-        </nav>
+        {/* Hamburger menu button - always visible */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors"
+        >
+          <Menu className="w-4 h-4 text-muted-foreground" />
+        </button>
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Language selector — names only, no flags */}
@@ -210,12 +205,7 @@ export function NavBar() {
           ) : (
             <UserMenu />
           )}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden w-8 h-8 rounded-lg bg-secondary/80 flex items-center justify-center"
-          >
-            <Menu className="w-4 h-4 text-muted-foreground" />
-          </button>
+
         </div>
       </div>
 
@@ -225,7 +215,7 @@ export function NavBar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-border/50 overflow-hidden"
+            className="border-t border-border/50 overflow-hidden"
           >
             <div className="px-4 py-2 space-y-1">
               {navItems.map(({ path, label, icon }) => (

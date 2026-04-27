@@ -7,6 +7,10 @@ import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { User, UserPlus, Loader2 } from 'lucide-react'
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
 export default function RegistroPage() {
   const { t } = useI18n()
   const router = useRouter()
@@ -20,6 +24,30 @@ export default function RegistroPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    // Client-side validation for all fields
+    if (!email.trim()) {
+      setError(t.fieldRequired)
+      return
+    }
+    if (!isValidEmail(email)) {
+      setError(t.emailInvalid)
+      return
+    }
+    if (!password) {
+      setError(t.fieldRequired)
+      return
+    }
+    if (password.length < 6) {
+      setError(t.minPasswordBoth)
+      return
+    }
+
+    if (!isLogin && !name.trim()) {
+      setError(t.fieldRequired)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -39,11 +67,6 @@ export default function RegistroPage() {
         }
       } else {
         // Register
-        if (password.length < 6) {
-          setError(t.minPassword)
-          setLoading(false)
-          return
-        }
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -80,6 +103,8 @@ export default function RegistroPage() {
       <div className="mesh-gradient-bg opacity-30">
         <div className="mesh-blob-1" />
         <div className="mesh-blob-2" />
+        <div className="mesh-blob-3" />
+        <div className="mesh-blob-4" />
       </div>
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -119,13 +144,14 @@ export default function RegistroPage() {
             {!isLogin && (
               <div>
                 <label className="text-sm font-medium text-foreground mb-1.5 block">
-                  {t.nameOptional}
+                  {t.nameRequired} <span className="text-destructive">*</span>
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder={t.name}
+                  required
                   autoComplete="name"
                   className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper/30"
                 />
@@ -133,7 +159,7 @@ export default function RegistroPage() {
             )}
             <div>
               <label className="text-sm font-medium text-foreground mb-1.5 block">
-                {t.email}
+                {t.email} <span className="text-destructive">*</span>
               </label>
               <input
                 type="email"
@@ -147,7 +173,7 @@ export default function RegistroPage() {
             </div>
             <div>
               <label className="text-sm font-medium text-foreground mb-1.5 block">
-                {t.password}
+                {t.password} <span className="text-destructive">*</span>
               </label>
               <input
                 type="password"
@@ -155,10 +181,11 @@ export default function RegistroPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder={isLogin ? '\u2022\u2022\u2022\u2022\u2022\u2022' : t.minPassword}
                 required
-                minLength={isLogin ? undefined : 6}
+                minLength={6}
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
                 className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-copper/30"
               />
+              <p className="text-[11px] text-muted-foreground mt-1">{t.minPasswordBoth}</p>
             </div>
 
             <AnimatePresence>

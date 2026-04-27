@@ -265,10 +265,12 @@ export default function HomePage() {
   const heroTextY = useTransform(scrollY, [0, 600], [0, 80])
 
   return (
-    <div className="flex-1">
+    <div className="flex-1 relative">
+      {/* Animated background spanning entire page */}
+      <HeroBackground scrollY={scrollY} />
+
       {/* Hero section */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-        <HeroBackground scrollY={scrollY} />
 
         <motion.div
           style={{ y: heroTextY }}
@@ -341,24 +343,7 @@ export default function HomePage() {
           </motion.div>
         </motion.div>
 
-        {/* Scroll indicator */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 0.8 }}
-        >
-          <motion.div
-            className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-1.5"
-            animate={{}}
-          >
-            <motion.div
-              className="w-1.5 h-1.5 rounded-full bg-copper"
-              animate={{ y: [0, 16, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          </motion.div>
-        </motion.div>
+
       </section>
 
       {/* Features */}

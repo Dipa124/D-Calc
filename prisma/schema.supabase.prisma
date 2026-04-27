@@ -1,15 +1,14 @@
-// D-Calc — Supabase PostgreSQL Schema
-// Use this schema for Vercel production deployment
-// To switch: Replace prisma/schema.prisma with this file's content
-// And set DATABASE_URL to your Supabase connection string
+// Supabase PostgreSQL schema — used for Vercel production
+// This file is automatically swapped in during Vercel builds via the build script
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  relationMode = "prisma" // Required for Supabase pgbouncer (pooled connections)
 }
 
 model User {
@@ -29,7 +28,7 @@ model Project {
   id        String   @id @default(cuid())
   userId    String
   name      String
-  data      String   @db.Text // JSON string of the Project object
+  data      String   // JSON string of the Project object
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -80,8 +79,8 @@ model SharedReport {
   id          String    @id @default(cuid())
   userId      String?   // Optional - can be shared by guests too
   reportType  String    // "producer" or "invoice"
-  projectData String    @db.Text // JSON string of the project data
-  pricingData String    @db.Text // JSON string of the pricing result
+  projectData String    // JSON string of the project data
+  pricingData String    // JSON string of the pricing result
   currency    String    @default("EUR")
   createdAt   DateTime  @default(now())
   expiresAt   DateTime? // Optional expiration

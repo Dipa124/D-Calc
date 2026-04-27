@@ -1,5 +1,9 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// LOCAL DEVELOPMENT: Uses SQLite (default)
+// VERCEL PRODUCTION: Uses Supabase PostgreSQL (schema.supabase.prisma is swapped in during build)
+// The build script automatically replaces this file with schema.supabase.prisma for Vercel deploys.
 
 generator client {
   provider = "prisma-client-js"

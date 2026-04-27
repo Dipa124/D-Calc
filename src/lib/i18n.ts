@@ -218,6 +218,7 @@ export interface Translations {
   password: string;
   name: string;
   nameOptional: string;
+  nameRequired: string;
   enter: string;
   createAccount: string;
   noAccount: string;
@@ -227,6 +228,9 @@ export interface Translations {
   loginDesc: string;
   registerDesc: string;
   minPassword: string;
+  minPasswordBoth: string;
+  emailInvalid: string;
+  fieldRequired: string;
   incorrectCredentials: string;
   loginError: string;
   registerError: string;
@@ -596,6 +600,7 @@ const translations: Record<Locale, Translations> = {
     password: 'Contraseña',
     name: 'Nombre',
     nameOptional: 'Nombre (opcional)',
+    nameRequired: 'Nombre',
     enter: 'Entrar',
     createAccount: 'Crear cuenta',
     noAccount: '¿No tienes cuenta?',
@@ -605,6 +610,9 @@ const translations: Record<Locale, Translations> = {
     loginDesc: 'Accede a tu cuenta para guardar proyectos y ver estadísticas',
     registerDesc: 'Guarda tus proyectos y accede a estadísticas de ventas',
     minPassword: 'Mínimo 6 caracteres',
+    minPasswordBoth: 'La contraseña debe tener al menos 6 caracteres',
+    emailInvalid: 'Formato de email no válido',
+    fieldRequired: 'Este campo es obligatorio',
     incorrectCredentials: 'Email o contraseña incorrectos',
     loginError: 'Error al iniciar sesión',
     registerError: 'Error al crear la cuenta',
@@ -926,6 +934,7 @@ const translations: Record<Locale, Translations> = {
     password: 'Password',
     name: 'Name',
     nameOptional: 'Name (optional)',
+    nameRequired: 'Name',
     enter: 'Sign in',
     createAccount: 'Create account',
     noAccount: "Don't have an account?",
@@ -935,6 +944,9 @@ const translations: Record<Locale, Translations> = {
     loginDesc: 'Sign in to save projects and view statistics',
     registerDesc: 'Save your projects and access sales statistics',
     minPassword: 'Minimum 6 characters',
+    minPasswordBoth: 'Password must be at least 6 characters',
+    emailInvalid: 'Invalid email format',
+    fieldRequired: 'This field is required',
     incorrectCredentials: 'Incorrect email or password',
     loginError: 'Error signing in',
     registerError: 'Error creating account',
@@ -1256,6 +1268,7 @@ const translations: Record<Locale, Translations> = {
     password: '密码',
     name: '姓名',
     nameOptional: '姓名（可选）',
+    nameRequired: '姓名',
     enter: '登录',
     createAccount: '创建账户',
     noAccount: '没有账户？',
@@ -1265,6 +1278,9 @@ const translations: Record<Locale, Translations> = {
     loginDesc: '登录以保存项目和查看统计',
     registerDesc: '保存项目并访问销售统计',
     minPassword: '至少6个字符',
+    minPasswordBoth: '密码至少需要6个字符',
+    emailInvalid: '邮箱格式无效',
+    fieldRequired: '此字段为必填',
     incorrectCredentials: '邮箱或密码不正确',
     loginError: '登录出错',
     registerError: '创建账户出错',
@@ -1586,6 +1602,7 @@ const translations: Record<Locale, Translations> = {
     password: 'Pasahitza',
     name: 'Izena',
     nameOptional: 'Izena (aukerazkoa)',
+    nameRequired: 'Izena',
     enter: 'Sartu',
     createAccount: 'Sortu kontua',
     noAccount: 'Konturik ez duzu?',
@@ -1595,6 +1612,9 @@ const translations: Record<Locale, Translations> = {
     loginDesc: 'Hasi saioa proiektuak gordetzeko eta estatistikak ikusteko',
     registerDesc: 'Gorde zure proiektuak eta salmenta estatistikak ikusi',
     minPassword: 'Gutxienez 6 karaktere',
+    minPasswordBoth: 'Pasahitzak gutxienez 6 karaktere izan behar ditu',
+    emailInvalid: 'Posta elektroniko formatu baliogabea',
+    fieldRequired: 'Eremu hau beharrezkoa da',
     incorrectCredentials: 'Posta edo pasahitza okerrak',
     loginError: 'Errorea saioa hastean',
     registerError: 'Errorea kontua sortzerakoan',
