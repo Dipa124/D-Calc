@@ -215,21 +215,37 @@ export function ExportOptions({ project, selectedResult }: ExportOptionsProps) {
 
   <hr class="divider" />
 
-  ${(selectedResult.totalPackaging > 0 || selectedResult.totalShipping > 0) ? `
+  ${selectedResult.totalShipping > 0 ? `
   <div class="piece">
     <div>
-      <div class="piece-name">Embalaje y envío</div>
-      <div class="piece-detail">Gastos de envío y manipulación</div>
+      <div class="piece-name">Envío</div>
+      <div class="piece-detail">Gastos de envío</div>
     </div>
-    <div class="piece-price">${formatCurrency(selectedResult.totalPackaging + selectedResult.totalShipping)}</div>
+    <div class="piece-price">${formatCurrency(selectedResult.totalShipping)}</div>
   </div>
   <hr class="divider" />
   ` : ''}
 
   <div class="total-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Precio total</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${formatCurrency(selectedResult.totalPriceBeforeTax)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">IVA (${project.params.taxRate}%)</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${formatCurrency(selectedResult.totalTax)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Precio con IVA</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${formatCurrency(selectedResult.totalPriceBeforeTax + selectedResult.totalTax)}</span>
+    </div>
+    ${selectedResult.totalShipping > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Envío</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${formatCurrency(selectedResult.totalShipping)}</span>
+    </div>` : ''}
+    <hr class="divider" style="margin:8px 0;" />
     <div class="total-label">Total del proyecto</div>
     <div class="total-price">${formatCurrency(selectedResult.totalProjectPrice)}</div>
-    <div class="includes-iva">IVA (${project.params.taxRate}%) incluido</div>
   </div>
 
   <div class="footer">

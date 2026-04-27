@@ -193,6 +193,7 @@ export interface Translations {
   totalBase: string;
   totalProfitLabel: string;
   priceBeforeTax: string;
+  priceWithIva: string;
   taxIncluded: string;
   projectTotal: string;
   
@@ -579,6 +580,7 @@ const translations: Record<Locale, Translations> = {
     totalBase: 'Coste base total',
     totalProfitLabel: 'Beneficio total',
     priceBeforeTax: 'Precio sin IVA',
+    priceWithIva: 'Precio con IVA',
     taxIncluded: 'IVA incluido',
     projectTotal: 'PRECIO TOTAL DEL PROYECTO',
     producerReport: 'Reporte productor',
@@ -913,6 +915,7 @@ const translations: Record<Locale, Translations> = {
     totalBase: 'Total base cost',
     totalProfitLabel: 'Total profit',
     priceBeforeTax: 'Price before tax',
+    priceWithIva: 'Price with VAT',
     taxIncluded: 'Tax included',
     projectTotal: 'TOTAL PROJECT PRICE',
     producerReport: 'Producer report',
@@ -1247,6 +1250,7 @@ const translations: Record<Locale, Translations> = {
     totalBase: '基础总成本',
     totalProfitLabel: '总利润',
     priceBeforeTax: '税前价格',
+    priceWithIva: '含税价格',
     taxIncluded: '含税',
     projectTotal: '项目总价',
     producerReport: '生产者报告',
@@ -1581,6 +1585,7 @@ const translations: Record<Locale, Translations> = {
     totalBase: 'Oinarrizko kostu totala',
     totalProfitLabel: 'Irabazi totala',
     priceBeforeTax: 'Zerga aurreko prezioa',
+    priceWithIva: 'BEZarekin prezioa',
     taxIncluded: 'Zerga barne',
     projectTotal: 'PROIEKTU PREZIO TOTALA',
     producerReport: 'Ekoizle txostena',

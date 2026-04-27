@@ -280,21 +280,37 @@ function generateInvoiceHtml(
 
   <hr class="divider" />
 
-  ${(pricing.totalPackaging > 0 || pricing.totalShipping > 0) ? `
+  ${pricing.totalShipping > 0 ? `
   <div class="piece">
     <div>
-      <div class="piece-name">Embalaje y envío</div>
-      <div class="piece-detail">Gastos de envío y manipulación</div>
+      <div class="piece-name">Envío</div>
+      <div class="piece-detail">Gastos de envío</div>
     </div>
-    <div class="piece-price">${fc(pricing.totalPackaging + pricing.totalShipping)}</div>
+    <div class="piece-price">${fc(pricing.totalShipping)}</div>
   </div>
   <hr class="divider" />
   ` : ''}
 
   <div class="total-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Precio total</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${fc(pricing.totalPriceBeforeTax)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">IVA (${project.params.taxRate}%)</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${fc(pricing.totalTax)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Precio con IVA</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${fc(pricing.totalPriceBeforeTax + pricing.totalTax)}</span>
+    </div>
+    ${pricing.totalShipping > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+      <span style="font-size:13px;color:#6B6572;">Envío</span>
+      <span style="font-family:'Space Grotesk',monospace;font-weight:600;font-size:15px;">${fc(pricing.totalShipping)}</span>
+    </div>` : ''}
+    <hr class="divider" style="margin:8px 0;" />
     <div class="total-label">Total del proyecto</div>
     <div class="total-price">${fc(pricing.totalProjectPrice)}</div>
-    <div class="includes-iva">IVA (${project.params.taxRate}%) incluido</div>
   </div>
 
   <div class="footer">

@@ -325,13 +325,14 @@ function generateReport(project: Project, result: ProjectPricingResult, t: Recor
     </table>
     <h2>${t.projectSummary}</h2>
     <table>
-    <tr><td>${t.totalBase}</td><td>${formatCurrency(result.totalBaseCost, project.currency)}</td></tr>
-    ${isInvoice ? '' : `<tr><td>${t.totalProfitLabel}</td><td>${formatCurrency(result.totalProfit, project.currency)}</td></tr>`}
+    ${isInvoice ? '' : `<tr><td>${t.totalBase}</td><td>${formatCurrency(result.totalBaseCost, project.currency)}</td></tr>
+    <tr><td>${t.totalProfitLabel}</td><td>${formatCurrency(result.totalProfit, project.currency)}</td></tr>`}
     <tr><td>${t.priceBeforeTax}</td><td>${formatCurrency(result.totalPriceBeforeTax, project.currency)}</td></tr>
     <tr><td>${t.taxIncluded} (${project.params.taxRate}%)</td><td>${formatCurrency(result.totalTax, project.currency)}</td></tr>
-    ${result.totalPackaging > 0 ? `<tr><td>${t.packaging}</td><td>${formatCurrency(result.totalPackaging, project.currency)}</td></tr>` : ''}
+    ${isInvoice ? `<tr><td>${t.priceWithIva || 'Precio con IVA'}</td><td>${formatCurrency(result.totalPriceBeforeTax + result.totalTax, project.currency)}</td></tr>` : ''}
+    ${isInvoice ? '' : `${result.totalPackaging > 0 ? `<tr><td>${t.packaging}</td><td>${formatCurrency(result.totalPackaging, project.currency)}</td></tr>` : ''}`}
     ${result.totalShipping > 0 ? `<tr><td>${t.shipping}</td><td>${formatCurrency(result.totalShipping, project.currency)}</td></tr>` : ''}
-    ${result.totalExtraExpenses > 0 ? `<tr><td>${t.extraExpensesLabel || 'Extra'}</td><td>${formatCurrency(result.totalExtraExpenses, project.currency)}</td></tr>` : ''}
+    ${isInvoice ? '' : `${result.totalExtraExpenses > 0 ? `<tr><td>${t.extraExpensesLabel || 'Extra'}</td><td>${formatCurrency(result.totalExtraExpenses, project.currency)}</td></tr>` : ''}`}
     <tr class="total-row"><td>${t.projectTotal}</td><td>${formatCurrency(result.totalProjectPrice, project.currency)}</td></tr>
     </table>
     <div class="footer"><p>${t.generatedBy} &middot; ${new Date().toLocaleDateString()}</p></div>
