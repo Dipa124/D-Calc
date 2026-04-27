@@ -22,6 +22,13 @@ export interface ExtraExpense {
   price: number;
 }
 
+// ─── Monthly Expense ───
+export interface MonthlyExpense {
+  id: string;
+  description: string;
+  amount: number;
+}
+
 // ─── Printer Profile (user-created) ───
 export interface PrinterProfile {
   id: string;
@@ -72,7 +79,6 @@ export interface ProjectParams {
   electricityCostPerKWh: number;
   supervisionCostPerHour: number; // Rate for passive print supervision (low — ~5% of print time)
   failureRate: number;
-  overheadPercentage: number;
   // Logistics & Business
   taxRate: number;
   packagingCostPerProject: number;
@@ -90,6 +96,8 @@ export interface ProjectParams {
   minimumOrderPrice: number;        // Floor price — no sale below this
   // Project-level extra expenses
   extraExpenses: ExtraExpense[];
+  // Monthly expenses (rent, software, insurance, etc.)
+  monthlyExpenses: MonthlyExpense[];
 }
 
 // ─── Project ───
@@ -233,7 +241,7 @@ export function getDefaultProjectParams(): ProjectParams {
     printerCost: 300, printerLifespanHours: 5000, maintenanceCostPerHour: 0.10,
     powerConsumptionWatts: 200, electricityCostPerKWh: 0.15,
     supervisionCostPerHour: 5,
-    failureRate: 5, overheadPercentage: 10,
+    failureRate: 5,
     taxRate: 21, packagingCostPerProject: 0.50, shippingCostPerProject: 0,
     dailyUsageHours: 8, amortizationMonths: 30,
     monthlyMaintenanceCost: 0, additionalInitialCost: 0,
@@ -241,6 +249,7 @@ export function getDefaultProjectParams(): ProjectParams {
     commissionPercentage: 0, commissionFixed: 0,
     priceRounding: 'none', minimumOrderPrice: 0,
     extraExpenses: [],
+    monthlyExpenses: [],
   };
 }
 

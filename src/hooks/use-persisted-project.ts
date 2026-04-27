@@ -35,6 +35,7 @@ function migrateProject(parsed: unknown): Project {
     priceRounding: proj.params.priceRounding ?? 'none',
     minimumOrderPrice: proj.params.minimumOrderPrice ?? 0,
     printerProfileId: proj.params.printerProfileId ?? 'custom',
+    monthlyExpenses: (proj.params as ProjectParams & { monthlyExpenses?: unknown }).monthlyExpenses || [],
   };
 
   // Ensure subPieces have all new fields

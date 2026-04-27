@@ -7,10 +7,11 @@ import { useI18n } from '@/hooks/use-i18n'
 import { usePersistedProject } from '@/hooks/use-persisted-project'
 import { calculateProjectPrice, formatCurrency } from '@/lib/calculator'
 import { useToast } from '@/hooks/use-toast'
-import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType, PostProcessType, PrinterProfile, ExtraExpense } from '@/lib/types'
+import type { Project, SubPiece, SaleType, PricingTier, ProjectParams, ProjectPricingResult, SubPieceCostBreakdown, FilamentType, FinishingType, PostProcessType, PrinterProfile, ExtraExpense, MonthlyExpense } from '@/lib/types'
 import { generateId, generateExpenseId, getDefaultSubPiece, FILAMENT_DEFAULTS, PRICING_TIER_CONFIG, SALE_TYPE_CONFIG, FINISHING_DEFAULTS, POST_PROCESS_DEFAULTS, printerProfileToParams } from '@/lib/types'
 import { CURRENCIES, getCurrencySymbol, type CurrencyCode } from '@/lib/currency'
 import { InfoTooltip } from '@/components/calculator/info-tooltip'
+import { SharePopup } from '@/components/calculator/share-popup'
 import { LOCALE_NAMES, type Locale } from '@/lib/i18n'
 import {
   Plus, Printer, Settings, Pencil, Copy, Check, Clock, Weight, Hash, Package,
@@ -148,7 +149,10 @@ function PieceCard({ subPiece, index, currency, onChange, onRemove, t }: {
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="glass-card section-card overflow-hidden">
       <div className="flex items-center gap-2 p-3">
         <input type="color" value={subPiece.color} onChange={(e) => update({ color: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0" />
-        <input type="text" value={subPiece.name} onChange={(e) => update({ name: e.target.value })} className="font-display font-semibold text-sm text-foreground bg-transparent border-none outline-none flex-1 min-w-0" />
+        <div className="flex items-center flex-1 min-w-0">
+          <input type="text" value={subPiece.name} onChange={(e) => update({ name: e.target.value })} className="font-display font-semibold text-sm text-foreground bg-transparent border-none outline-none flex-1 min-w-0" />
+          <Pencil className="w-3 h-3 text-muted-foreground/40 shrink-0 ml-1" />
+        </div>
         <span className="text-[10px] text-muted-foreground font-mono">&times;{subPiece.quantity}</span>
         <button onClick={() => setExpanded(!expanded)} className="w-6 h-6 rounded flex items-center justify-center hover:bg-secondary/80"><motion.div animate={{ rotate: expanded ? 0 : 180 }} transition={{ duration: 0.2 }}><ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /></motion.div></button>
         <button onClick={onRemove} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10"><Trash2 className="w-3.5 h-3.5 text-destructive/60" /></button>
@@ -337,10 +341,10 @@ export default function CalculatorPage() {
   const [savingProject, setSavingProject] = useState(false)
   const [recordingSale, setRecordingSale] = useState(false)
   const [sharingReport, setSharingReport] = useState(false)
-  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
   const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([])
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [editingProfile, setEditingProfile] = useState<PrinterProfile | null>(null)
+  const [sharePopupUrl, setSharePopupUrl] = useState<string | null>(null)
   const projectNameRef = useRef<HTMLInputElement>(null)
 
   const tierNameMap: Record<string, string> = { competitive: t.competitive, standard: t.standard, premium: t.premium, luxury: t.luxury }
@@ -413,8 +417,7 @@ export default function CalculatorPage() {
       const res = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportType, projectData: project, pricingData: selectedResult, currency: project.currency, userId: session?.user?.id || null }) })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
-      await navigator.clipboard.writeText(`${window.location.origin}${data.url}`)
-      toast({ title: t.shareLinkCopied, description: `${window.location.origin}${data.url}` })
+      setSharePopupUrl(`${window.location.origin}${data.url}`)
     } catch { toast({ title: t.errorSharing, variant: 'destructive' }) } finally { setSharingReport(false) }
   }, [project, selectedResult, session?.user?.id, toast, t])
 
@@ -522,21 +525,9 @@ export default function CalculatorPage() {
               <SettingsField icon={<Zap className="w-3.5 h-3.5" />} label={t.powerConsumption} tooltip={t.tooltipPower} value={project.params.powerConsumptionWatts} onChange={(v) => updateParams({ powerConsumptionWatts: v })} step={10} />
               <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.electricityCost} tooltip={t.tooltipElectricity} value={project.params.electricityCostPerKWh} onChange={(v) => updateParams({ electricityCostPerKWh: v })} step={0.01} />
               <SettingsField icon={<Eye className="w-3.5 h-3.5" />} label={t.supervisionRate} tooltip={t.tooltipSupervision} value={project.params.supervisionCostPerHour} onChange={(v) => updateParams({ supervisionCostPerHour: v })} step={0.5} />
+              <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
+              <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.monthlyMaintenance} tooltip={t.tooltipMonthlyMaintenance} value={project.params.monthlyMaintenanceCost} onChange={(v) => updateParams({ monthlyMaintenanceCost: v })} step={1} />
             </div>
-            <button onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)} className="flex items-center gap-2 text-xs font-medium text-copper hover:text-copper-dark transition-colors w-full">
-              <Settings className="w-3.5 h-3.5" />{advancedSettingsOpen ? t.hideAdvanced : t.showAdvanced}
-              <motion.div animate={{ rotate: advancedSettingsOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="ml-auto"><ChevronDown className="w-3.5 h-3.5" /></motion.div>
-            </button>
-            <AnimatePresence>
-              {advancedSettingsOpen && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-secondary/30 border border-border">
-                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.failureRate} tooltip={t.tooltipFailureRate} value={project.params.failureRate} onChange={(v) => updateParams({ failureRate: v })} step={1} max={100} />
-                    <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.overhead} tooltip={t.tooltipOverhead} value={project.params.overheadPercentage} onChange={(v) => updateParams({ overheadPercentage: v })} step={1} max={100} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.section>
 
           {/* Logistics & Business */}
@@ -547,12 +538,29 @@ export default function CalculatorPage() {
               <SettingsField icon={<Package className="w-3.5 h-3.5" />} label={t.packaging} tooltip={t.tooltipPackaging} value={project.params.packagingCostPerProject} onChange={(v) => updateParams({ packagingCostPerProject: v })} step={0.1} />
               <SettingsField icon={<Truck className="w-3.5 h-3.5" />} label={t.shipping} tooltip={t.tooltipShipping} value={project.params.shippingCostPerProject} onChange={(v) => updateParams({ shippingCostPerProject: v })} step={0.5} />
             </div>
+            {/* Monthly Expenses */}
+            <div className="border-t border-border/50 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Receipt className="w-3 h-3" /> {t.monthlyExpenses} <InfoTooltip text={t.tooltipMonthlyExpenses} side="right" /></span>
+                <button onClick={() => { const newExpense: MonthlyExpense = { id: generateExpenseId(), description: '', amount: 0 }; updateParams({ monthlyExpenses: [...(project.params.monthlyExpenses || []), newExpense] }) }} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-copper/10 text-copper text-[10px] font-semibold hover:bg-copper/20 transition-colors"><Plus className="w-3 h-3" /> {t.addMonthlyExpense}</button>
+              </div>
+              {(project.params.monthlyExpenses || []).length > 0 && (
+                <div className="space-y-2">
+                  {(project.params.monthlyExpenses || []).map((expense, idx) => (
+                    <div key={expense.id} className="flex items-center gap-2">
+                      <input type="text" value={expense.description} onChange={(e) => { const updated = [...(project.params.monthlyExpenses || [])]; updated[idx] = { ...updated[idx], description: e.target.value }; updateParams({ monthlyExpenses: updated }) }} placeholder={t.expenseDescription} className="flex-1 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-copper" />
+                      <input type="number" min={0} step={1} value={expense.amount} onChange={(e) => { const updated = [...(project.params.monthlyExpenses || [])]; updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || 0 }; updateParams({ monthlyExpenses: updated }) }} placeholder={t.monthlyAmount} className="w-24 px-2 py-1 rounded-md bg-background border border-border text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-copper" />
+                      <button onClick={() => updateParams({ monthlyExpenses: (project.params.monthlyExpenses || []).filter(e => e.id !== expense.id) })} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 shrink-0"><Minus className="w-3 h-3 text-destructive/60" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="border-t border-border/50 pt-3">
               <div className="flex items-center gap-2 mb-3"><Building2 className="w-3.5 h-3.5 text-diamond" /><span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t.amortizationPerHour}</span></div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <SettingsField icon={<Clock className="w-3.5 h-3.5" />} label={t.dailyUsageHours} tooltip={t.tooltipDailyUsage} value={project.params.dailyUsageHours} onChange={(v) => updateParams({ dailyUsageHours: v })} step={1} min={1} />
                 <SettingsField icon={<Timer className="w-3.5 h-3.5" />} label={t.amortizationMonths} tooltip={t.tooltipAmortization} value={project.params.amortizationMonths} onChange={(v) => updateParams({ amortizationMonths: v })} step={1} min={1} />
-                <SettingsField icon={<Wrench className="w-3.5 h-3.5" />} label={t.monthlyMaintenance} tooltip={t.tooltipMonthlyMaintenance} value={project.params.monthlyMaintenanceCost} onChange={(v) => updateParams({ monthlyMaintenanceCost: v })} step={1} />
                 <SettingsField icon={<DollarSign className="w-3.5 h-3.5" />} label={t.additionalInitialCost} tooltip={t.tooltipAdditionalCost} value={project.params.additionalInitialCost} onChange={(v) => updateParams({ additionalInitialCost: v })} step={10} />
                 <SettingsField icon={<ShieldCheck className="w-3.5 h-3.5" />} label={t.bufferFactor} tooltip={t.tooltipBufferFactor} value={project.params.bufferFactor} onChange={(v) => updateParams({ bufferFactor: Math.min(2.0, Math.max(1.0, v)) })} step={0.1} min={1.0} max={2.0} />
                 <SettingsField icon={<Percent className="w-3.5 h-3.5" />} label={t.commissionPct} tooltip={t.tooltipCommissionPct} value={project.params.commissionPercentage} onChange={(v) => updateParams({ commissionPercentage: v })} step={0.5} max={100} />
@@ -694,6 +702,9 @@ export default function CalculatorPage() {
           )}
         </div>
       </div>
+
+      {/* Share Popup */}
+      <SharePopup url={sharePopupUrl || ''} title={project.name} open={!!sharePopupUrl} onClose={() => setSharePopupUrl(null)} />
 
       {/* Printer Profile Modal */}
       <AnimatePresence>

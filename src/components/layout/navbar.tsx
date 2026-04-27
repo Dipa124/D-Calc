@@ -98,7 +98,7 @@ function UserMenu() {
               <BarChart3 className="w-4 h-4 text-copper" />{t.dashboard}
             </button>
             <button
-              onClick={() => setOpen(false)}
+              onClick={() => { router.push('/dashboard'); setOpen(false) }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary/80 transition-colors"
             >
               <Settings className="w-4 h-4 text-muted-foreground" />{t.accountSettings}
@@ -120,8 +120,8 @@ function UserMenu() {
 // ─── Route map for nav ───
 const ROUTE_MAP: Record<string, string> = {
   '/home': 'home',
-  '/calculadora': 'calculator',
-  '/registro': 'auth',
+  '/calculator': 'calculator',
+  '/register': 'auth',
   '/dashboard': 'dashboard',
 }
 
@@ -139,7 +139,7 @@ export function NavBar() {
 
   const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     { path: '/home', label: t.navHome || 'Home', icon: <HomeIcon className="w-4 h-4" /> },
-    { path: '/calculadora', label: t.navCalculator || 'Calculator', icon: <Calculator className="w-4 h-4" /> },
+    { path: '/calculator', label: t.navCalculator || 'Calculator', icon: <Calculator className="w-4 h-4" /> },
     ...(session?.user ? [{ path: '/dashboard', label: t.navDashboard || 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }] : []),
   ]
 
@@ -149,6 +149,7 @@ export function NavBar() {
         <motion.button
           onClick={() => router.push('/home')}
           className="flex items-center gap-2.5 shrink-0 group"
+          style={{ flexShrink: 0 }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -162,7 +163,7 @@ export function NavBar() {
           </div>
         </motion.button>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex flex-1 items-center justify-center gap-1">
           {navItems.map(({ path, label, icon }) => (
             <motion.button
               key={path}
@@ -182,7 +183,7 @@ export function NavBar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Language selector — names only, no flags */}
           <select
             value={locale}
@@ -199,7 +200,7 @@ export function NavBar() {
 
           {!session?.user ? (
             <motion.button
-              onClick={() => router.push('/registro')}
+              onClick={() => router.push('/register')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-copper to-copper-dark text-white text-xs font-semibold hover:shadow-lg hover:shadow-copper/20 transition-all"
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.97 }}

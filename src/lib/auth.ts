@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: '/registro',
+    signIn: '/register',
   },
   secret: process.env.NEXTAUTH_SECRET,
 }

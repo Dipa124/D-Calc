@@ -417,6 +417,12 @@ export interface Translations {
   // Toast messages
   shareLinkCopied: string;
   errorSharing: string;
+
+  // Monthly expenses
+  monthlyExpenses: string;
+  addMonthlyExpense: string;
+  monthlyAmount: string;
+  tooltipMonthlyExpenses: string;
 }
 
 const translations: Record<Locale, Translations> = {
@@ -745,6 +751,10 @@ const translations: Record<Locale, Translations> = {
     shareInvoice: 'Compartir factura',
     shareLinkCopied: '¡Enlace copiado!',
     errorSharing: 'Error al compartir',
+    monthlyExpenses: 'Gastos mensuales',
+    addMonthlyExpense: 'Añadir gasto mensual',
+    monthlyAmount: 'Importe mensual (€)',
+    tooltipMonthlyExpenses: 'Gastos mensuales fijos (alquiler, software, seguro, etc.). Se distribuyen entre las horas de uso mensuales.',
   },
   en: {
     appName: 'D-Calc',
@@ -1071,6 +1081,10 @@ const translations: Record<Locale, Translations> = {
     shareInvoice: 'Share invoice',
     shareLinkCopied: 'Share link copied!',
     errorSharing: 'Failed to share report',
+    monthlyExpenses: 'Monthly expenses',
+    addMonthlyExpense: 'Add monthly expense',
+    monthlyAmount: 'Monthly amount (€)',
+    tooltipMonthlyExpenses: 'Fixed monthly expenses (rent, software, insurance, etc.). Distributed across monthly usage hours.',
   },
   zh: {
     appName: 'D-Calc',
@@ -1397,6 +1411,10 @@ const translations: Record<Locale, Translations> = {
     shareInvoice: '分享发票',
     shareLinkCopied: '分享链接已复制！',
     errorSharing: '分享失败',
+    monthlyExpenses: '月度支出',
+    addMonthlyExpense: '添加月度支出',
+    monthlyAmount: '月度金额 (€)',
+    tooltipMonthlyExpenses: '固定月度支出（租金、软件、保险等）。按月使用小时数分摊。',
   },
   eu: {
     appName: 'D-Calc',
@@ -1723,6 +1741,10 @@ const translations: Record<Locale, Translations> = {
     shareInvoice: 'Partekatu faktura',
     shareLinkCopied: 'Esteka kopiatua!',
     errorSharing: 'Akatsa partekatzean',
+    monthlyExpenses: 'Hilabeteko gastuak',
+    addMonthlyExpense: 'Gehitu hilabeteko gastua',
+    monthlyAmount: 'Hilabeteko kopurua (€)',
+    tooltipMonthlyExpenses: 'Hilabeteko gastu finkoak (alokairua, softwarea, asegurua, etab.). Hilabeteko erabilera orduen artean banatzen dira.',
   },
 };
 

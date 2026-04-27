@@ -117,11 +117,16 @@ export function calculateSubPiecePrice(
     extraExpensesCost +
     failureCost;
 
-  // Overhead per unit
-  const overheadPerUnit = subtotalPerUnit * (params.overheadPercentage / 100);
+  // Monthly expenses cost per unit
+  // Sum all monthly expenses, divide by hours per month, multiply by print time for this unit
+  const totalMonthlyExpenses = (params.monthlyExpenses || []).reduce((sum: number, e: { amount: number }) => sum + e.amount, 0);
+  const dailyHours = params.dailyUsageHours || 8;
+  const hoursPerMonth = dailyHours * 30;
+  const monthlyExpensesPerHour = hoursPerMonth > 0 ? totalMonthlyExpenses / hoursPerMonth : 0;
+  const monthlyExpensesCost = monthlyExpensesPerHour * totalPrintTimeHours;
 
-  // Base cost per unit
-  const baseCostPerUnit = subtotalPerUnit + overheadPerUnit;
+  // Base cost per unit (subtotal includes monthly expenses distributed per unit)
+  const baseCostPerUnit = subtotalPerUnit + monthlyExpensesCost;
 
   // Adjusted margin: base margin × sale type multiplier
   const adjustedMargin = profitMargin * getSaleMultiplier(saleType, customMultiplier);
@@ -156,7 +161,7 @@ export function calculateSubPiecePrice(
     extraExpensesCost,
     failureCost,
     subtotalPerUnit,
-    overheadPerUnit,
+    overheadPerUnit: monthlyExpensesCost,
     baseCostPerUnit,
     profitPerUnit,
     priceBeforeTaxPerUnit,

@@ -67,18 +67,56 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session?.user?.id) return
     let cancelled = false
-    Promise.all([
-      fetch('/api/sales/stats').then(r => r.json()),
-      fetch('/api/projects').then(r => r.json()),
-      fetch('/api/printer-profiles').then(r => r.json()),
-    ]).then(([statsData, projectsData, profilesData]) => {
+
+    const defaultStats: DashboardStats = {
+      totalRevenue: 0,
+      totalProjects: 0,
+      totalSales: 0,
+      avgPrice: 0,
+      recentSales: [],
+      monthlyBreakdown: [],
+      salesByTier: {},
+    }
+
+    const fetchData = async () => {
+      let statsData: DashboardStats = defaultStats
+      let projectsData: ProjectInfo[] = []
+      let profilesData: PrinterProfileInfo[] = []
+
+      try {
+        const statsRes = await fetch('/api/sales/stats')
+        if (statsRes.ok) {
+          statsData = await statsRes.json()
+        }
+      } catch {
+        // Use default stats
+      }
+
+      try {
+        const projectsRes = await fetch('/api/projects')
+        if (projectsRes.ok) {
+          projectsData = await projectsRes.json()
+        }
+      } catch {
+        // Use empty projects
+      }
+
+      try {
+        const profilesRes = await fetch('/api/printer-profiles')
+        if (profilesRes.ok) {
+          profilesData = await profilesRes.json()
+        }
+      } catch {
+        // Use empty profiles
+      }
+
       if (cancelled) return
       setStats(statsData)
       setProjects(projectsData.map((p: { id: string; name: string; createdAt: string }) => ({ id: p.id, name: p.name, createdAt: p.createdAt })))
       setProfiles(profilesData.map((p: { id: string; name: string; model: string }) => ({ id: p.id, name: p.name, model: p.model })))
-    }).catch(() => {
-      // ignore errors
-    }).finally(() => {
+    }
+
+    fetchData().catch(() => {}).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
@@ -99,7 +137,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">{t.loginDesc}</p>
-          <button onClick={() => router.push('/registro')} className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-semibold">{t.enter}</button>
+          <button onClick={() => router.push('/register')} className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-copper to-copper-dark text-white font-semibold">{t.enter}</button>
         </div>
       </div>
     )
